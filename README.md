@@ -9,6 +9,8 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/vulinh1704/mantis/actions/workflows/ci.yml"><img src="https://github.com/vulinh1704/mantis/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <img src="https://img.shields.io/badge/status-early%20development-111111?style=flat-square" alt="Early development">
   <img src="https://img.shields.io/badge/license-MIT-111111?style=flat-square" alt="MIT license">
   <img src="https://img.shields.io/badge/skills-SKILL.md-111111?style=flat-square" alt="Agent Skills format">
   <img src="https://img.shields.io/badge/browser-Playwright-111111?style=flat-square" alt="Playwright">
@@ -69,7 +71,7 @@ mantis look http://localhost:3000 --routes /,/settings --locales en,vi
 
 ## Install
 
-> Mantis is in early development. These commands go live with the first public release.
+> Mantis is in early development (v0.1). Expect rough edges, and please [open an issue](https://github.com/vulinh1704/mantis/issues) when it gets something wrong.
 
 **Claude Code**
 
@@ -87,14 +89,29 @@ npx skills add vulinh1704/mantis
 **Just the CLI**
 
 ```bash
-npx -y @vulinh1704/mantis look http://localhost:3000
+npx -y github:vulinh1704/mantis look http://localhost:3000
 ```
 
-Mantis drives Chromium through Playwright. If the browser isn't installed yet, run `npx playwright install chromium`.
+Mantis drives Chromium through Playwright. If the browser isn't installed yet, run `npx playwright install chromium`. Node.js 20 or newer.
 
 ## Numbers
 
-These come with the first release. We will run the same agent on the same tasks, with and without Mantis, several times each, on apps with planted UI bugs. We will publish the method, the tasks and the misses, not only the wins.
+What has been measured so far:
+
+- **Planted bugs.** `fixtures/buggy-app` has 13 planted UI bugs, listed in
+  [`PLANTED.json`](fixtures/buggy-app/PLANTED.json). Mantis reports every one
+  of them in exactly the screen, theme and language cells where it was planted,
+  and nothing else. On `fixtures/clean-app`, the same app with every bug fixed,
+  it reports zero issues. Both checks run in CI.
+- **Real sites.** On 10 public sites (example.com, playwright.dev, Hacker News,
+  tailwindcss.com, MDN, svelte.dev, react.dev, gov.uk, vercel.com and
+  stripe.com), 18 of the 21 errors it reported held up when checked by hand.
+  The 3 false positives were demo frames on tailwindcss.com. Checked on
+  2026-10-26.
+
+Still to come is the agent benchmark: the same agent on the same tasks, with
+and without Mantis, several runs each. We will publish the method, the tasks and
+the misses, not only the wins.
 
 ## Limits
 
@@ -102,6 +119,10 @@ These come with the first release. We will run the same agent on the same tasks,
   design skill.
 - It doesn't click through flows or check hover and focus states yet.
 - It doesn't measure animation smoothness yet.
+- It can be fooled by fixes that only hide a problem. For example,
+  `overflow-x: hidden` on the body hides a page overflow, and hiding an
+  element hides its overlap. `/mantis-fix` is told never to do this, and
+  catching it automatically is the next feature.
 
 ## Why a mantis shrimp?
 
