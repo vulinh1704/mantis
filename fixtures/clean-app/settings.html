@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Settings — Lumen</title>
+  <link rel="icon" href="/img/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/i18n.js"></script>
+</head>
+<body>
+  <header class="app-header">
+    <div class="container header-inner">
+      <a class="brand" href="/"><img src="/img/logo.svg" width="28" height="28" alt=""><span>Lumen</span></a>
+      <span class="workspace" data-i18n="app.workspace">Sóng workspace</span>
+      <button class="avatar-btn" type="button" aria-label="Account menu" data-i18n-aria="app.account"><img src="/img/team.svg" width="32" height="32" alt=""></button>
+    </div>
+  </header>
+
+  <main class="container settings">
+    <nav class="settings-nav" aria-label="Settings">
+      <a href="#profile" class="active" aria-current="page" data-i18n="set.nav.profile">Profile</a>
+      <a href="#notifications" data-i18n="set.nav.notifications">Notifications</a>
+      <a href="#billing" data-i18n="set.nav.billing">Billing</a>
+      <a href="#danger-zone" data-i18n="set.nav.danger">Danger zone</a>
+    </nav>
+
+    <div class="settings-body">
+      <h1 class="settings-title" data-i18n="set.title">Account settings</h1>
+
+      <form id="settings-form" class="card" action="#">
+        <h2 id="profile" class="card-title" data-i18n="set.profile">Profile</h2>
+        <div class="field">
+          <label for="name" data-i18n="set.name">Full name</label>
+          <input id="name" name="name" value="Linh Tran" autocomplete="name">
+        </div>
+        <div class="field">
+          <label for="email" data-i18n="set.email">Email address</label>
+          <input id="email" name="email" type="email" value="linh@song.vn" autocomplete="email">
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="language" data-i18n="set.language">Language</label>
+            <select id="language" name="language"><option>English</option><option>Tiếng Việt</option></select>
+          </div>
+          <div class="field">
+            <label for="tz" data-i18n="set.tz">Time zone</label>
+            <select id="tz" name="tz"><option>Asia/Ho_Chi_Minh (GMT+7)</option><option>Europe/Berlin (GMT+1)</option></select>
+          </div>
+        </div>
+
+        <h3 id="notifications" class="subhead" data-i18n="set.notif">Email notifications</h3>
+        <label class="check"><input type="checkbox" name="weekly" checked> <span data-i18n="set.weekly">Weekly summary</span></label>
+        <label class="check"><input type="checkbox" name="alerts" checked> <span data-i18n="set.alerts">Traffic spike alerts</span></label>
+        <label class="check"><input type="checkbox" name="product"> <span data-i18n="set.product">Product updates</span></label>
+
+        <div class="form-actions">
+          <button class="btn btn-ghost" type="reset" data-i18n="set.cancel">Cancel</button>
+          <button id="save-settings" class="btn btn-primary" type="submit" data-i18n="set.save">Save changes</button>
+        </div>
+      </form>
+
+      <section id="danger-zone" class="card danger">
+        <h2 id="danger-title" class="card-title" data-i18n="set.danger.title">Danger zone</h2>
+        <p data-i18n="set.danger.text">Deleting your workspace removes all sites, dashboards and data. This cannot be undone.</p>
+        <button class="btn btn-danger" type="button" data-i18n="set.danger.cta">Delete workspace</button>
+      </section>
+    </div>
+  </main>
+
+  <footer class="container app-footer">
+    <p><span data-i18n="set.footer">© 2026 Lumen Labs</span> · <a href="/legal" data-i18n="set.terms">Terms</a> · <a href="/legal#privacy" data-i18n="set.privacy">Privacy</a></p>
+  </footer>
+  <script>applyI18n('set.meta.title')</script>
+  <script src="/settings.js"></script>
+</body>
+</html>

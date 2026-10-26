@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#eef2ff"/>
+      <stop offset="0.55" stop-color="#e0f2fe"/>
+      <stop offset="1" stop-color="#fdf4ff"/>
+    </linearGradient>
+    <linearGradient id="area" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#6366f1" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#6366f1" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="bar" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#6366f1"/>
+      <stop offset="1" stop-color="#22d3ee"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#1e1b4b" flood-opacity="0.16"/>
+    </filter>
+  </defs>
+  <rect width="1200" height="675" fill="url(#sky)"/>
+  <g filter="url(#shadow)">
+    <rect x="70" y="56" width="1060" height="570" rx="20" fill="#ffffff"/>
+  </g>
+  <rect x="70" y="56" width="1060" height="48" rx="20" fill="#f8fafc"/>
+  <rect x="70" y="84" width="1060" height="20" fill="#f8fafc"/>
+  <line x1="70" y1="104" x2="1130" y2="104" stroke="#e2e8f0"/>
+  <circle cx="100" cy="80" r="7" fill="#fca5a5"/>
+  <circle cx="124" cy="80" r="7" fill="#fcd34d"/>
+  <circle cx="148" cy="80" r="7" fill="#86efac"/>
+  <rect x="420" y="70" width="360" height="20" rx="10" fill="#e2e8f0"/>
+
+  <!-- sidebar -->
+  <rect x="70" y="104" width="190" height="522" fill="#f8fafc"/>
+  <line x1="260" y1="104" x2="260" y2="626" stroke="#e2e8f0"/>
+  <rect x="94" y="130" width="28" height="28" rx="8" fill="#6366f1"/>
+  <rect x="132" y="137" width="80" height="14" rx="7" fill="#c7d2fe"/>
+  <rect x="94" y="190" width="142" height="34" rx="10" fill="#eef2ff"/>
+  <rect x="108" y="201" width="90" height="12" rx="6" fill="#6366f1"/>
+  <rect x="108" y="246" width="100" height="12" rx="6" fill="#cbd5e1"/>
+  <rect x="108" y="286" width="80" height="12" rx="6" fill="#cbd5e1"/>
+  <rect x="108" y="326" width="110" height="12" rx="6" fill="#cbd5e1"/>
+  <rect x="108" y="366" width="70" height="12" rx="6" fill="#cbd5e1"/>
+
+  <!-- KPI cards -->
+  <g font-family="Inter, Arial, sans-serif">
+    <rect x="290" y="130" width="250" height="104" rx="14" fill="#ffffff" stroke="#e2e8f0"/>
+    <text x="312" y="164" font-size="15" fill="#64748b">Visitors</text>
+    <text x="312" y="208" font-size="34" font-weight="700" fill="#0f172a">48.2k</text>
+    <rect x="448" y="186" width="70" height="26" rx="13" fill="#dcfce7"/>
+    <text x="462" y="204" font-size="14" font-weight="700" fill="#15803d">+12%</text>
+
+    <rect x="560" y="130" width="250" height="104" rx="14" fill="#ffffff" stroke="#e2e8f0"/>
+    <text x="582" y="164" font-size="15" fill="#64748b">Conversion</text>
+    <text x="582" y="208" font-size="34" font-weight="700" fill="#0f172a">4.8%</text>
+    <rect x="718" y="186" width="70" height="26" rx="13" fill="#dcfce7"/>
+    <text x="733" y="204" font-size="14" font-weight="700" fill="#15803d">+0.6</text>
+
+    <rect x="830" y="130" width="270" height="104" rx="14" fill="#ffffff" stroke="#e2e8f0"/>
+    <text x="852" y="164" font-size="15" fill="#64748b">Avg. visit</text>
+    <text x="852" y="208" font-size="34" font-weight="700" fill="#0f172a">2m 41s</text>
+  </g>
+
+  <!-- line chart -->
+  <rect x="290" y="256" width="520" height="340" rx="14" fill="#ffffff" stroke="#e2e8f0"/>
+  <line x1="316" y1="330" x2="786" y2="330" stroke="#f1f5f9" stroke-width="2"/>
+  <line x1="316" y1="400" x2="786" y2="400" stroke="#f1f5f9" stroke-width="2"/>
+  <line x1="316" y1="470" x2="786" y2="470" stroke="#f1f5f9" stroke-width="2"/>
+  <line x1="316" y1="540" x2="786" y2="540" stroke="#f1f5f9" stroke-width="2"/>
+  <path d="M316 500 C356 488 376 452 416 456 S476 492 516 470 S576 398 616 404 S676 436 716 386 S766 330 786 322 L786 570 L316 570 Z" fill="url(#area)"/>
+  <path d="M316 500 C356 488 376 452 416 456 S476 492 516 470 S576 398 616 404 S676 436 716 386 S766 330 786 322" fill="none" stroke="#6366f1" stroke-width="4" stroke-linecap="round"/>
+  <path d="M316 534 C366 528 406 518 456 520 S556 500 606 498 S706 470 786 462" fill="none" stroke="#22d3ee" stroke-width="3" stroke-dasharray="2 9" stroke-linecap="round"/>
+  <circle cx="716" cy="386" r="7" fill="#ffffff" stroke="#6366f1" stroke-width="4"/>
+  <rect x="316" y="280" width="140" height="14" rx="7" fill="#cbd5e1"/>
+
+  <!-- funnel -->
+  <rect x="830" y="256" width="270" height="340" rx="14" fill="#ffffff" stroke="#e2e8f0"/>
+  <rect x="852" y="280" width="110" height="14" rx="7" fill="#cbd5e1"/>
+  <rect x="852" y="322" width="226" height="34" rx="9" fill="url(#bar)"/>
+  <rect x="852" y="372" width="180" height="34" rx="9" fill="url(#bar)" opacity="0.85"/>
+  <rect x="852" y="422" width="128" height="34" rx="9" fill="url(#bar)" opacity="0.7"/>
+  <rect x="852" y="472" width="84" height="34" rx="9" fill="url(#bar)" opacity="0.55"/>
+  <rect x="852" y="522" width="52" height="34" rx="9" fill="url(#bar)" opacity="0.4"/>
+</svg>

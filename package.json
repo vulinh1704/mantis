@@ -1,0 +1,43 @@
+{
+  "name": "@vulinh1704/mantis",
+  "version": "0.1.0",
+  "description": "Give your coding agent eyes for UI work: sweep viewports x color schemes x locales in a real browser, detect layout, contrast, dark-mode and i18n bugs with evidence, and get annotated screenshots plus a compact report.",
+  "type": "module",
+  "bin": {
+    "mantis": "bin/mantis.js"
+  },
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "skills"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "serve:buggy": "node test/helpers/static-server.js fixtures/buggy-app 4321",
+    "serve:clean": "node test/helpers/static-server.js fixtures/clean-app 4322"
+  },
+  "keywords": [
+    "agent",
+    "skills",
+    "claude-code",
+    "ui",
+    "visual-testing",
+    "accessibility",
+    "dark-mode",
+    "i18n",
+    "playwright",
+    "screenshots"
+  ],
+  "author": "Truong Dang Vu Linh",
+  "license": "MIT",
+  "dependencies": {
+    "axe-core": "^4.14.0",
+    "playwright": "^1.64.1"
+  }
+}
