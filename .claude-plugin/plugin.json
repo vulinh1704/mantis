@@ -1,0 +1,13 @@
+{
+  "name": "mantis",
+  "version": "0.1.0",
+  "description": "Gives your coding agent eyes for UI work: checks every screen, theme and language in a real browser, fixes what is broken at the root, and proves it with before/after screenshots.",
+  "author": {
+    "name": "Truong Dang Vu Linh",
+    "url": "https://github.com/vulinh1704"
+  },
+  "homepage": "https://github.com/vulinh1704/mantis",
+  "repository": "https://github.com/vulinh1704/mantis",
+  "license": "MIT",
+  "keywords": ["ui", "frontend", "visual-qa", "responsive", "dark-mode", "accessibility", "playwright"]
+}

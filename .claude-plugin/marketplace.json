@@ -1,0 +1,18 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "mantis",
+  "description": "Mantis gives coding agents eyes for UI work.",
+  "owner": {
+    "name": "Truong Dang Vu Linh",
+    "url": "https://github.com/vulinh1704"
+  },
+  "plugins": [
+    {
+      "name": "mantis",
+      "description": "Look at the UI before calling it done: every screen, theme and language, fixed at the root, with before/after proof.",
+      "source": "./",
+      "category": "development",
+      "keywords": ["ui", "frontend", "visual-qa", "responsive", "dark-mode"]
+    }
+  ]
+}
