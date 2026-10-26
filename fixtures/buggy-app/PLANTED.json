@@ -1,5 +1,5 @@
 {
-  "$comment": "Ground truth for test/fixtures.test.js. Every bug planted in this app, with what Mantis must report. An issue matches an expectation when type, route and severity are equal and its selector is the expected selector (or a descendant selector of it, or the evidence.with element for overlaps). Cells use viewport/scheme/locale with * as wildcard; the cells reported for an expectation must be exactly these. The test also fails on any reported issue that matches no expectation.",
+  "$comment": "Ground truth for test/fixtures.test.js. Every bug planted in this app, with what Mantis must report. An issue matches an expectation when type, route and severity are equal and its selector is the expected selector (or, with descendants: true, a selector inside it); `with` must equal evidence.with for overlaps and `message` is a regex. Cells use viewport/scheme/locale with * as wildcard; the cells reported for an expectation must be exactly these. minCount counts affected elements (grouped issues carry evidence.count). The test also fails on any reported issue that matches no expectation.",
   "matrix": {
     "routes": ["/", "/settings"],
     "viewports": ["mobile", "tablet", "desktop"],
@@ -65,7 +65,7 @@
       "fix": "use var(--surface) like the other cards",
       "expect": [
         { "type": "theme-leak", "severity": "error", "selector": "#plan-business", "cells": "*/dark/*" },
-        { "type": "contrast", "severity": "error", "selector": "#plan-business", "descendants": true, "minIssues": 5, "cells": "*/dark/*" }
+        { "type": "contrast", "severity": "error", "selector": "#plan-business", "descendants": true, "minCount": 10, "cells": "*/dark/*" }
       ]
     },
     {
@@ -106,7 +106,7 @@
       "where": "styles.css .social a { width: 16px; height: 16px }",
       "fix": "40x40 targets",
       "expect": [
-        { "type": "tap-target", "severity": "warn", "selector": "#social-links", "descendants": true, "minIssues": 3, "cells": "mobile/*/*" }
+        { "type": "tap-target", "severity": "warn", "selector": "#social-links", "descendants": true, "minCount": 3, "cells": "mobile/*/*" }
       ]
     },
     {

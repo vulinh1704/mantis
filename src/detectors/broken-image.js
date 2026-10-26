@@ -15,7 +15,7 @@ export default {
       M.reset();
       const issues = [];
       for (const img of document.images) {
-        if (M.inOverlay(img)) continue;
+        if (M.ignored(img)) continue;
         const src = img.currentSrc || img.getAttribute('src') || '';
         if (!src.trim()) continue;
         if (!img.complete || img.naturalWidth > 0) continue;

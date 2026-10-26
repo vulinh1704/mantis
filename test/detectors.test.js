@@ -38,7 +38,7 @@ function htmlDoc(body, css = '', head = '') {
 }
 
 /** Open an in-memory page in a context configured like a Mantis cell. */
-async function open(html, { viewport = 'desktop', scheme = 'light', assets = {}, setup = [] } = {}) {
+async function open(html, { viewport = 'desktop', scheme = 'light', assets = {}, setup = [], lib = {} } = {}) {
   const v = VIEWPORT_PRESETS[viewport];
   const context = await browser.newContext(contextOptions({ viewport: v, scheme, locale: 'en' }));
   await context.route('**/*', (route) => {
@@ -59,7 +59,7 @@ async function open(html, { viewport = 'desktop', scheme = 'light', assets = {},
   for (const d of setup) await d.setup(page, ctx);
   await page.goto(`${ORIGIN}/`, { waitUntil: 'load' });
   await settle(page, { idleTimeout: 3000 });
-  await page.evaluate(installMantisLib);
+  await page.evaluate(installMantisLib, lib);
   return { context, page, ctx };
 }
 
@@ -196,9 +196,87 @@ describe('tap-target', () => {
       <div style="margin:80px 20px"><button id="lonely" style="width:16px;height:16px;padding:0"></button></div>
       <label style="margin:20px;display:block"><input type="checkbox"> Remember me</label>`;
     const issues = await detect(tapTarget, body, { viewport: 'mobile' });
-    assert.deepEqual(sels(issues), ['#ia', '#ib', '#ic']);
-    assert.ok(issues.every((i) => i.severity === 'warn'));
+    assert.equal(issues.length, 1, 'three targets of the same kind are grouped');
+    assert.equal(issues[0].selector, '#ia');
+    assert.equal(issues[0].severity, 'warn');
+    assert.equal(issues[0].evidence.count, 3);
+    assert.equal(issues[0].extraRects.length, 2, 'every target is outlined');
     assert.deepEqual(await detect(tapTarget, body, { viewport: 'desktop' }), [], 'only runs on phone-sized viewports');
+  });
+
+  test('off-screen skip links are not targets', async () => {
+    const body = `
+      <div style="position:absolute;left:-9999px;top:0;display:flex;gap:2px"><a href="#a" style="display:block;width:10px;height:10px">A</a><a href="#b" style="display:block;width:10px;height:10px">B</a></div>
+      <div style="position:fixed;left:100%;top:10px;display:flex;gap:2px"><a href="#c" style="display:block;width:10px;height:10px">C</a><a href="#d" style="display:block;width:10px;height:10px">D</a></div>`;
+    assert.deepEqual(await detect(tapTarget, body, { viewport: 'mobile' }), []);
+  });
+});
+
+describe('precision guards', () => {
+  test('overlap: a fanned deck of identical cards and a pointer-events:none hint are fine', async () => {
+    const cards = [0, 1, 2].map((i) => `<a href="#c${i}" class="shot" style="position:absolute;left:${40 + i * 60}px;top:40px;width:220px;height:140px;background:#ddd;transform:rotate(${(i - 1) * 6}deg)">Shot ${i}</a>`).join('');
+    const hint = `<form style="position:relative;width:260px;margin:20px"><input style="width:260px;height:36px;box-sizing:border-box;background:#f2f2f2;border:0" placeholder="Search">
+      <div style="position:absolute;right:8px;top:8px;pointer-events:none"><kbd>Ctrl</kbd> <kbd>K</kbd></div></form>`;
+    assert.deepEqual(await detect(overlap, `<div style="position:relative;height:240px">${cards}</div>${hint}`), []);
+  });
+
+  test('overlap: transparent hit-area padding, layered duplicate text and stacked mock cards are fine', async () => {
+    const icons = `<div style="display:flex;margin:20px">
+      <button aria-label="Menu" style="margin-right:-10px;padding:12px;background:none;border:0"><svg width="20" height="20"><rect width="20" height="20"/></svg></button>
+      <button aria-label="Search" style="padding:12px;background:none;border:0"><svg width="20" height="20"><rect width="20" height="20"/></svg></button></div>`;
+    const layered = `<h1 style="position:relative;margin:20px;font-size:32px"><span>Grow your revenue</span>
+      <span aria-label="x" style="position:absolute;left:0;top:0;color:#4f46e5;background:#fff">Grow your revenue</span></h1>`;
+    const stack = `<div style="position:relative;height:220px;margin:20px">${[0, 1, 2].map((i) => `<div class="mock-card" style="position:absolute;left:${i * 30}px;top:${i * 40}px;width:240px;padding:12px;background:#fff;border:1px solid #ccc"><p style="margin:0">Payment ${i} succeeded</p></div>`).join('')}</div>`;
+    assert.deepEqual(await detect(overlap, icons + layered + stack), []);
+  });
+
+  test('clipped-text: a cropped preview frame is not a cut label; a max-height teaser is a truncation warning', async () => {
+    const frame = `<div id="frame" style="width:300px;height:120px;overflow:hidden;border:1px solid #ccc">
+      <div><div><div><div><p style="width:600px;margin:0">${'Demo content wider than its frame. '.repeat(6)}</p></div></div></div></div></div>`;
+    const teaser = `<p id="teaser" style="width:220px;max-height:48px;overflow:hidden;line-height:24px;margin:20px 0">${'A summary that is longer than two lines of text. '.repeat(3)}</p>`;
+    const issues = await detect(clippedText, frame + teaser);
+    assert.deepEqual(issues.map((i) => [i.selector, i.severity, i.key]), [['#teaser', 'warn', 'truncated']]);
+    assert.match(issues[0].message, /max-height of 48px/);
+  });
+
+  test('clipped-text: big display links that wrap are typography, not broken buttons', async () => {
+    const issues = await detect(clippedText, '<a href="#" style="display:block;width:180px;padding:8px;background:#eee;font-size:28px">Shrinivass Arunachalam Balasubramanian</a>');
+    assert.deepEqual(issues, []);
+  });
+
+  test('theme-leak: a readable inverted button is fine, a readable light panel is a warning', async () => {
+    const css = ':root{--bg:#fff;--text:#111827} @media (prefers-color-scheme: dark){:root{--bg:#0b1020;--text:#e5e7eb}} body{background:var(--bg);color:var(--text)}';
+    const body = `<a href="#" id="inv" style="display:inline-block;margin:20px;padding:10px 16px;background:#fff;color:#111">Get started</a>
+      <section id="panel" style="margin:20px;padding:24px;width:320px;background:#f8fafc;color:#1f2937">A note box with hard-coded colors that stays light.</section>`;
+    const snaps = {};
+    const pages = [];
+    for (const scheme of ['light', 'dark']) {
+      const o = await open(htmlDoc(body, css), { scheme });
+      pages.push(o);
+      snaps[scheme] = await themeLeak.collect(o.page);
+    }
+    const cmp = themeLeak.compare(snaps.light, snaps.dark);
+    const issues = await themeLeak.resolve(pages[1].page, cmp.findings);
+    for (const o of pages) await o.context.close();
+    assert.deepEqual(issues.map((i) => [i.selector, i.severity, i.evidence.kind]), [['#panel', 'warn', 'container']]);
+  });
+
+  test('contrast: one issue per failing color pair, listing every element', async () => {
+    const issues = await detect(contrast, '<p style="color:#999">One</p><p style="color:#999">Two</p><span style="color:#999">Three</span><p style="color:#222">Fine</p>');
+    assert.equal(issues.length, 1);
+    assert.equal(issues[0].evidence.count, 3);
+    assert.match(issues[0].message, /in 3 elements/);
+    assert.equal(issues[0].extraRects.length, 2);
+  });
+
+  test('data-mantis-ignore and --ignore selectors silence a subtree', async () => {
+    const body = '<div data-mantis-ignore><img src="/missing-a.png" alt="a" width="40" height="40"></div><div class="third-party"><img src="/missing-b.png" alt="b" width="40" height="40"></div><img id="kept" src="/missing-c.png" alt="c" width="40" height="40">';
+    const { context, page, ctx } = await open(htmlDoc(body), { lib: { ignore: ['.third-party'] } });
+    try {
+      assert.deepEqual(sels(await brokenImage.run(page, ctx)), ['#kept']);
+    } finally {
+      await context.close();
+    }
   });
 });
 

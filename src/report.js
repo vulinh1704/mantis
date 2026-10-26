@@ -218,6 +218,7 @@ export function buildReport({ version, runId, startedAt, finishedAt, options, ce
       schemes: options.schemes,
       locales: options.locales,
       darkStrategy: options.darkStrategyText,
+      ignore: options.ignore ?? [],
     },
     summary: {
       errors,

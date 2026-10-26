@@ -1,19 +1,23 @@
 import { chroma, contrastRatio, isLargeText, luminance, over, sameColor, toHex } from '../color.js';
 
 /**
- * theme-leak (error, cross-cell): parts of the page that ignore the dark color scheme.
+ * theme-leak (cross-cell): parts of the page that ignore the dark color scheme.
  *
  * Compares the light and dark cells of the same route + viewport + locale. Elements are matched
  * by their structural path (and tag/id/class signature). Only runs when the page background
- * really flipped (light page luminance > 0.4, dark page < 0.12). Two findings, reported in the
+ * really flipped (light page luminance > 0.4, dark page < 0.12). Findings, reported in the
  * dark cell:
- * - container: an element with its own opaque background that stays the same light neutral
- *   color (luminance >= 0.6, low chroma) in both schemes, stands out against the dark page
- *   (contrast >= 3) and holds text. Brand-colored surfaces (buttons, badges) are left alone
- *   because they are saturated. Only the outermost leaking container is reported.
- * - text: text whose color is identical in both schemes while the background behind it flipped
- *   from light to dark, and whose contrast passed in light but fails in dark. Sibling findings
- *   are grouped under their parent.
+ * - container (error): an element with its own opaque background that stays the same light
+ *   neutral color (luminance >= 0.6, low chroma) in both schemes, stands out against the dark
+ *   page (contrast >= 3), and whose text became unreadable (< 3:1) because of it.
+ * - container (warn): the same kind of light surface whose text is still readable (it ignores
+ *   the theme but nothing is lost). Light buttons and links with readable text are not
+ *   reported at all: an inverted primary button is a common deliberate dark-mode design.
+ *   Brand-colored surfaces are left alone because they are saturated. Only the outermost
+ *   leaking container is reported.
+ * - text (error): text whose color is identical in both schemes while the background behind it
+ *   flipped from light to dark, and whose contrast passed in light but fails in dark. Sibling
+ *   findings are grouped under their parent.
  */
 
 function collectSnapshot() {
@@ -30,9 +34,12 @@ function collectSnapshot() {
     if (r.width < 1 || r.height < 1) continue;
     if (!M.isRendered(el)) continue;
     const s = M.style(el);
+    if (M.ignored(el)) continue;
     const rec = {
       k: M.structKey(el),
       sig: M.signature(el),
+      tag: el.localName,
+      act: el.matches('a[href], button, summary, [role="button"], [role="link"]'),
       w: Math.round(r.width),
       h: Math.round(r.height),
       bg: M.parseColor(s.backgroundColor),
@@ -88,15 +95,22 @@ export function compareSnapshots(light, dark) {
   containers.sort((a, b) => a.k.length - b.k.length);
   const keptContainers = [];
   for (const c of containers) {
-    if (!keptContainers.some((k) => c.k.startsWith(k.k + '/'))) keptContainers.push(c);
-  }
-  for (const c of keptContainers) {
-    const inside = dark.els.filter((e) => e.c && e.eb && e.k.startsWith(c.k + '/') && contrastRatio(over(e.c, e.eb), e.eb) < 3);
+    if (keptContainers.some((k) => c.k.startsWith(k.k + '/'))) continue;
+    // Text in or under the container that the leak made hard to read (< 3:1).
+    const unreadable = dark.els.filter((e) => e.c && e.eb && (e.k === c.k || e.k.startsWith(c.k + '/')) && contrastRatio(over(e.c, e.eb), e.eb) < 3);
+    // A light button or link in a dark theme is a common deliberate design (inverted primary
+    // button); only report it when its text became unreadable. Other readable light surfaces are
+    // still reported, as warnings, if they are big enough to stand out.
+    if (!unreadable.length && (c.act || c.w * c.h < 2500)) continue;
+    keptContainers.push(c);
     result.findings.push({
       key: c.k,
       kind: 'container',
-      message: `keeps its light background ${toHex(c.bg)} in dark mode while the page switched to ${toHex(D)} — a hard-coded color instead of a theme token${inside.length ? `; ${inside.length} text element${inside.length > 1 ? 's' : ''} inside become${inside.length > 1 ? '' : 's'} near-invisible` : ''}.`,
-      evidence: { background: toHex(c.bg), pageLight: toHex(L), pageDark: toHex(D), unreadableTextInside: inside.length },
+      severity: unreadable.length ? 'error' : 'warn',
+      message: unreadable.length
+        ? `keeps its light background ${toHex(c.bg)} in dark mode while the page switched to ${toHex(D)}, and ${unreadable.length} text element${unreadable.length > 1 ? 's' : ''} in it become${unreadable.length > 1 ? '' : 's'} near-invisible — a hard-coded color instead of a theme token.`
+        : `keeps its light background ${toHex(c.bg)} in dark mode while the page switched to ${toHex(D)}: a light surface that ignores the theme (its text is still readable).`,
+      evidence: { background: toHex(c.bg), pageLight: toHex(L), pageDark: toHex(D), unreadableText: unreadable.length },
     });
   }
 
@@ -128,6 +142,7 @@ export function compareSnapshots(light, dark) {
     const color = toHex(first.d.c);
     const base = {
       kind: 'text',
+      severity: 'error',
       evidence: {
         color,
         backgroundLight: toHex(first.l.eb),
@@ -179,7 +194,7 @@ export default {
       if (!r) return;
       issues.push({
         type: 'theme-leak',
-        severity: 'error',
+        severity: f.severity || 'error',
         key: f.kind,
         selector: r.selector,
         rect: r.rect,

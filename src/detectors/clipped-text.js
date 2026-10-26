@@ -6,15 +6,19 @@
  *   counts as cut only when more than 25% of its height is outside, which ignores glyph boxes
  *   that merely poke out of tight line-heights. Text that is entirely outside counts when it is
  *   adjacent to the clip edge (the next nav item that got pushed out), not when it is far away.
- * - warn "truncated": cut with an ellipsis (text-overflow) or -webkit-line-clamp and no way to
- *   read the full text. Intentional truncation is ignored when the clipping element, the text's
- *   element, or a close ancestor carries a `title` or `aria-label` with the full text.
- * - warn "wrap": a button (or button-styled link) or a short form label wraps onto more than two
- *   lines, or breaks inside a word.
+ * - warn "truncated": deliberate truncation with no way to read the full text: an ellipsis
+ *   (text-overflow), -webkit-line-clamp, or a "teaser" box (max-height or a gradient fade-out
+ *   that cuts lines at the bottom). It is ignored when the clipping element, the text's element,
+ *   or a close ancestor carries a `title` or `aria-label`. Three or more of the same kind of
+ *   element are grouped into one warning.
+ * - warn "wrap": a short label (<= 5 words for buttons, <= 6 for form labels) on a narrow
+ *   (<= 260px), UI-sized (<= 20px font) button, button-styled link or label wraps onto more
+ *   than two lines, or breaks inside a word.
  *
- * Not reported: visually-hidden text (clip box <= 2px, clip/clip-path tricks), collapsed regions
- * (max-height: 0), content moved by transforms inside the clipper (carousels, tickers), and
- * scroll containers (overflow: auto/scroll), since the user can scroll those.
+ * Not reported: visually-hidden, off-screen or aria-hidden text; collapsed regions (max-height:
+ * 0); content moved by transforms inside the clipper (carousels, tickers); text cropped by an
+ * ancestor more than three levels up (framed previews and demo viewports); and scroll containers
+ * (overflow: auto/scroll), since the user can scroll those.
  */
 export default {
   name: 'clipped-text',
@@ -86,9 +90,21 @@ export default {
         return maxOut > 0 && (visible || adjacentHidden) ? { axis: 'y', overflow: Math.round(maxOut), hidden: Math.round(hidden) } : null;
       };
 
+      // A fade-out drawn over the end of the box (gradient pseudo-element) signals deliberate truncation.
+      const hasFade = (el) => ['::after', '::before'].some((p) => {
+        const ps = getComputedStyle(el, p);
+        return ps.content !== 'none' && ps.content !== 'normal' && /gradient/.test(ps.backgroundImage || '');
+      });
+      const depthBetween = (from, to) => {
+        let d = 0;
+        for (let n = from.parentElement; n && n !== to; n = n.parentElement) d++;
+        return d;
+      };
+
       for (const t of M.textNodes(document.body, 6000)) {
         const owner = t.parentElement;
         if (!M.isRendered(owner) || M.effectiveOpacity(owner) < 0.1) continue;
+        if (M.offscreen(owner) || M.ariaHidden(owner)) continue;
         const color = M.parseColor(M.style(owner).color);
         if (color && color[3] < 0.1) continue;
         const rects = M.textRects(t);
@@ -100,6 +116,8 @@ export default {
           const cy = M.clipsY(s);
           if (!cx && !cy) continue;
           if (transformedBetween(owner, c)) break;
+          // Text cropped by a distant ancestor is a framed preview/viewport, not a cut label.
+          if (c !== owner && depthBetween(owner, c) > 3) break;
           const box = M.paddingBox(c);
           if (box.right - box.left <= 2 || box.bottom - box.top <= 2 || visuallyHidden(s)) break;
           let cut = null;
@@ -108,7 +126,7 @@ export default {
           if (!cut) continue;
           let rec = found.get(c);
           if (!rec) {
-            rec = { el: c, axes: new Set(), overflow: 0, hidden: 0, texts: [], ellipsis: false, clamp: false };
+            rec = { el: c, axes: new Set(), overflow: 0, hidden: 0, texts: [], ellipsis: false, clamp: false, teaser: false };
             found.set(c, rec);
           }
           rec.axes.add(cut.axis);
@@ -118,6 +136,7 @@ export default {
           if (rec.texts.length < 3 && !rec.texts.includes(snip)) rec.texts.push(snip);
           if (cut.axis === 'x' && (s.textOverflow || '').includes('ellipsis')) rec.ellipsis = true;
           if (cut.axis === 'y' && M.isLineClamped(s)) rec.clamp = true;
+          if (cut.axis === 'y' && (s.maxHeight !== 'none' || hasFade(c))) rec.teaser = true;
           break;
         }
       }
@@ -130,6 +149,7 @@ export default {
       };
 
       const cutEls = new Set();
+      const truncated = [];
       for (const rec of found.values()) {
         const el = rec.el;
         const s = M.style(el);
@@ -149,17 +169,11 @@ export default {
           width: Math.round(el.getBoundingClientRect().width),
           height: Math.round(el.getBoundingClientRect().height),
         };
-        if (rec.ellipsis || rec.clamp) {
+        const intentional = rec.ellipsis || rec.clamp || (rec.teaser && !rec.axes.has('x'));
+        if (intentional) {
           if (fullTextHint(el)) continue; // intentional truncation that exposes the full text
-          issues.push({
-            type: 'clipped-text',
-            severity: 'warn',
-            key: 'truncated',
-            selector: sel,
-            rect,
-            message: `Text is truncated with ${rec.clamp ? 'line-clamp' : 'an ellipsis'} and the full text is not exposed (no title/aria-label): ${quoted}.`,
-            evidence,
-          });
+          const how = rec.clamp ? 'line-clamp' : rec.ellipsis ? 'an ellipsis' : `a max-height of ${s.maxHeight !== 'none' ? s.maxHeight : evidence.height + 'px'}`;
+          truncated.push({ el, sel, rect, how, quoted, evidence });
         } else {
           cutEls.add(el);
           const how = axes.includes('x')
@@ -174,6 +188,45 @@ export default {
             message: `Text is cut off by \`${sel}\` (${how}): ${rec.hidden}px of ${quoted} ${rec.texts.length > 1 ? 'are' : 'is'} hidden${rec.axes.has('x') ? ' horizontally' : ''}.`,
             evidence,
           });
+        }
+      }
+
+      // Intentional truncation without a way to read the full text: one warning per kind of
+      // element, so a list of 20 truncated cards does not produce 20 entries.
+      const bySig = new Map();
+      for (const tr of truncated) {
+        const sig = M.signature(tr.el).replace(/#[^.]*/, '');
+        if (!bySig.has(sig)) bySig.set(sig, []);
+        bySig.get(sig).push(tr);
+      }
+      for (const [sig, group] of bySig) {
+        const first = group[0];
+        const many = group.length >= 3;
+        issues.push({
+          type: 'clipped-text',
+          severity: 'warn',
+          key: 'truncated',
+          ...(many ? { dedupeKey: `truncated:${sig}` } : {}),
+          selector: first.sel,
+          rect: first.rect,
+          extraRects: many ? group.slice(1, 40).map((g) => g.rect) : undefined,
+          message: many
+            ? `${group.length} elements like \`${first.sel}\` truncate text with ${first.how} and do not expose the full text (no title/aria-label), e.g. ${group.slice(0, 3).map((g) => `"${g.evidence.texts[0]}"`).join(', ')}.`
+            : `Text is truncated with ${first.how} and the full text is not exposed (no title/aria-label): ${first.quoted}.`,
+          evidence: many ? { ...first.evidence, count: group.length, selectors: group.slice(0, 20).map((g) => g.sel) } : first.evidence,
+        });
+        if (!many) {
+          for (const g of group.slice(1)) {
+            issues.push({
+              type: 'clipped-text',
+              severity: 'warn',
+              key: 'truncated',
+              selector: g.sel,
+              rect: g.rect,
+              message: `Text is truncated with ${g.how} and the full text is not exposed (no title/aria-label): ${g.quoted}.`,
+              evidence: g.evidence,
+            });
+          }
         }
       }
 
@@ -204,8 +257,12 @@ export default {
       };
       const candidates = document.querySelectorAll('button, [role="button"], a[href], label');
       for (const el of candidates) {
-        if (M.inOverlay(el) || !M.isRendered(el) || M.effectiveOpacity(el) < 0.1) continue;
+        if (M.ignored(el) || !M.isRendered(el) || M.effectiveOpacity(el) < 0.1) continue;
+        if (M.offscreen(el) || M.ariaHidden(el)) continue;
         if (cutEls.has(el) || [...cutEls].some((c) => c.contains(el) || el.contains(c))) continue;
+        // Only UI-sized labels: display text that happens to be a link (a big name, a headline
+        // card) wrapping is typography, not a broken control.
+        if (parseFloat(M.style(el).fontSize) > 20) continue;
         const tag = el.localName;
         let kind = 'button';
         if (tag === 'label') kind = 'label';
@@ -213,9 +270,11 @@ export default {
         const text = (el.innerText || '').replace(/\s+/g, ' ').trim();
         if (!text) continue;
         const words = text.split(' ').flatMap((w) => w.split(/(?<=[-/])/)).filter(Boolean);
-        if (words.length > (kind === 'label' ? 6 : 8)) continue;
+        // Short labels on narrow controls; a sentence inside a card-sized button may wrap.
+        if (words.length > (kind === 'label' ? 6 : 5)) continue;
+        if (el.getBoundingClientRect().width > 260) continue;
         const lines = countLines(el);
-        const cjk = /[぀-ヿ㐀-鿿가-힯]/.test(text);
+        const cjk = /\p{Script=Han}|\p{Script=Hiragana}|\p{Script=Katakana}|\p{Script=Hangul}/u.test(text);
         const midWord = !cjk && lines > words.length;
         if (lines <= 2 && !midWord) continue;
         const sel = M.cssPath(el);

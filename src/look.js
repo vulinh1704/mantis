@@ -6,7 +6,7 @@ import { annotate } from './annotate.js';
 import { renderContactSheet } from './contact-sheet.js';
 import { CELL_DETECTORS, CROSS_DETECTORS } from './detectors/index.js';
 import { installMantisLib } from './inpage/lib.js';
-import { formatDarkStrategy, routeSlug } from './options.js';
+import { UsageError, formatDarkStrategy, routeSlug } from './options.js';
 import {
   applyDarkStrategy,
   contextOptions,
@@ -171,7 +171,8 @@ async function runCell(browser, opts, cell, baseline, log) {
         }
       }
 
-      await page.evaluate(installMantisLib);
+      const libOptions = { ignore: opts.ignore || [] };
+      await page.evaluate(installMantisLib, libOptions);
       const runPhase = async (phase) => {
         for (const d of CELL_DETECTORS) {
           if (d.phase !== phase || (d.applies && !d.applies(ctx))) continue;
@@ -190,7 +191,7 @@ async function runCell(browser, opts, cell, baseline, log) {
       await fontsReady(page);
       await finishAnimations(page);
       await nextFrames(page);
-      await page.evaluate(installMantisLib);
+      await page.evaluate(installMantisLib, libOptions);
       await runPhase('dom');
       await runPhase('final');
       for (const d of CROSS_DETECTORS) {
@@ -225,6 +226,19 @@ export async function look(opts, { log = () => {} } = {}) {
   const startedAt = new Date();
   const browser = await launchBrowser();
   try {
+    if (opts.ignore && opts.ignore.length) {
+      const probe = await browser.newPage();
+      const invalid = await probe.evaluate((sels) => sels.filter((s) => {
+        try {
+          document.querySelector(s);
+          return false;
+        } catch {
+          return true;
+        }
+      }), opts.ignore);
+      await probe.close();
+      if (invalid.length) throw new UsageError(`invalid --ignore selector: ${invalid.join(' | ')}`);
+    }
     await preflight(browser, new URL(opts.routes[0], opts.baseUrl).href);
 
     const outDir = path.resolve(opts.out);
@@ -306,8 +320,14 @@ export async function look(opts, { log = () => {} } = {}) {
           const shot = `shots/${r.info.id}.png`;
           const items = new Map();
           for (const raw of r.raw) {
-            const issue = registry.add(g.route, r.info.key, raw, raw.rect ? shot : null);
-            if (raw.rect && !items.has(issue.id)) items.set(issue.id, { n: issue.id, severity: raw.severity, rect: raw.rect });
+            const { extraRects, ...clean } = raw;
+            const issue = registry.add(g.route, r.info.key, clean, raw.rect ? shot : null);
+            // Grouped issues (same root cause in many elements) outline every element with the same number.
+            for (const rect of [raw.rect, ...(extraRects || [])]) {
+              if (!rect) continue;
+              const k = `${issue.id}:${rect.x},${rect.y},${rect.width},${rect.height}`;
+              if (!items.has(k)) items.set(k, { n: issue.id, severity: raw.severity, rect });
+            }
           }
           r.items = [...items.values()];
         }

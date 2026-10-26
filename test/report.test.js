@@ -201,7 +201,8 @@ describe('theme-leak comparison', () => {
       ['container', 'html/body[1]/div[0]'],
       ['text', 'html/body[1]/h2[2]'],
     ]);
-    assert.equal(r.findings[0].evidence.unreadableTextInside, 1);
+    assert.equal(r.findings[0].evidence.unreadableText, 1);
+    assert.equal(r.findings[0].severity, 'error');
   });
 
   test('no findings when the page background did not flip', () => {

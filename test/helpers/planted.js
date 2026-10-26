@@ -38,8 +38,11 @@ export function evaluate(report, planted) {
       const missingCells = [...want].filter((c) => !got.has(c));
       const extraCells = hits.flatMap((h) => h.cells.filter((c) => !want.has(c)).map((c) => `#${h.id} ${c}`));
       const minIssues = exp.minIssues ?? 1;
+      // Grouped issues (one root cause in many elements) carry evidence.count.
+      const elements = hits.reduce((sum, h) => sum + (h.evidence?.count ?? 1), 0);
       let reason = null;
       if (hits.length < minIssues) reason = `expected at least ${minIssues} issue(s), found ${hits.length}`;
+      else if (exp.minCount && elements < exp.minCount) reason = `expected at least ${exp.minCount} affected element(s), found ${elements}`;
       else if (missingCells.length) reason = `missing in ${missingCells.length} cell(s): ${missingCells.join(', ')}`;
       else if (extraCells.length) reason = `also reported in unexpected cells: ${extraCells.join(', ')}`;
       expectations.push({
