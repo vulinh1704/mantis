@@ -121,11 +121,13 @@ describe('parseProofArgs', () => {
   });
 
   test('video', () => {
-    const o = parseProofArgs(['--video', '--before-url', 'http://a.test', '--after-url', 'http://b.test', '--out', 'x/p.png', '--viewport', 'desktop']);
+    const o = parseProofArgs(['--video', '--before-url', 'http://a.test', '--after-url', 'http://b.test', '--out', 'x/p.png', '--viewport', 'desktop', '--dark-strategy', 'class:dark']);
     assert.equal(o.video, true);
     assert.equal(o.before, null);
     assert.equal(o.videoOut, 'x/p.mp4');
     assert.equal(o.viewport.name, 'desktop');
+    assert.deepEqual(o.darkStrategy, { kind: 'class', name: 'dark' });
+    assert.deepEqual(parseProofArgs(['--before', 'a', '--after', 'b']).darkStrategy, { kind: 'media' });
   });
 
   test('usage errors', () => {

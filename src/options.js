@@ -157,6 +157,7 @@ const LOCALE_RE = /^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$/;
  * @property {boolean} json
  * @property {number} concurrency
  * @property {number} timeout
+ * @property {string[]} ignore  CSS selectors excluded from every detector (plus [data-mantis-ignore]).
  */
 
 /**
@@ -182,6 +183,7 @@ export function parseLookArgs(argv) {
         json: { type: 'boolean' },
         concurrency: { type: 'string' },
         timeout: { type: 'string' },
+        ignore: { type: 'string', multiple: true },
       },
     });
   } catch (err) {
@@ -242,6 +244,7 @@ export function parseLookArgs(argv) {
     json: Boolean(values.json),
     concurrency: parseIntOpt('concurrency', values.concurrency, 1, 16) ?? LOOK_DEFAULTS.concurrency,
     timeout: parseIntOpt('timeout', values.timeout, 1000, 600000) ?? LOOK_DEFAULTS.timeout,
+    ignore: (values.ignore ?? []).map((s) => s.trim()).filter(Boolean),
   };
 }
 
@@ -254,6 +257,7 @@ export function parseLookArgs(argv) {
  * @property {string|null} beforeUrl
  * @property {string|null} afterUrl
  * @property {Viewport} viewport
+ * @property {DarkStrategy} darkStrategy
  * @property {string} videoOut
  */
 
@@ -277,6 +281,7 @@ export function parseProofArgs(argv) {
         'before-url': { type: 'string' },
         'after-url': { type: 'string' },
         viewport: { type: 'string' },
+        'dark-strategy': { type: 'string' },
       },
     });
   } catch (err) {
@@ -309,6 +314,7 @@ export function parseProofArgs(argv) {
     beforeUrl: v['before-url'] ?? null,
     afterUrl: v['after-url'] ?? null,
     viewport: parseViewport(v.viewport ?? 'mobile'),
+    darkStrategy: parseDarkStrategy(v['dark-strategy'] ?? 'media'),
     videoOut: out.replace(/\.png$/i, '.mp4'),
   };
 }

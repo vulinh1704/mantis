@@ -6,8 +6,9 @@
  * All rects returned by the helpers named `doc*` are in document coordinates (CSS px from the
  * top-left of the page), which is what annotations and full-page screenshots use.
  */
-export function installMantisLib() {
-  if (window.__mantis && window.__mantis.v === 3) return true;
+export function installMantisLib(options = {}) {
+  const ignoreSelector = ['[data-mantis-ignore]', ...(options.ignore || [])].join(', ');
+  if (window.__mantis && window.__mantis.v === 4 && window.__mantis.ignoreSelector === ignoreSelector) return true;
 
   const SKIP_TEXT_PARENTS = new Set([
     'script', 'style', 'noscript', 'template', 'title', 'option', 'optgroup', 'select',
@@ -40,6 +41,34 @@ export function installMantisLib() {
 
   function inOverlay(el) {
     return !!(el && el.closest && el.closest('[data-mantis-overlay]'));
+  }
+
+  /** Excluded by the page (data-mantis-ignore) or the user (--ignore), or Mantis' own overlay. */
+  function ignored(el) {
+    if (!el || !el.closest) return false;
+    if (inOverlay(el)) return true;
+    try {
+      return !!el.closest(ignoreSelector);
+    } catch {
+      return !!el.closest('[data-mantis-ignore]');
+    }
+  }
+
+  /** Inside an aria-hidden="true" subtree: declared decorative by the page. */
+  function ariaHidden(el) {
+    return !!(el && el.closest && el.closest('[aria-hidden="true"]'));
+  }
+
+  /** Entirely outside the page (e.g. a skip link parked at left:-9999px or left:100%). */
+  function offscreen(el) {
+    const r = el.getBoundingClientRect();
+    if (layerKind(el) === 'fixed') return r.right <= 0 || r.bottom <= 0 || r.left >= innerWidth || r.top >= innerHeight;
+    const html = document.documentElement;
+    const W = Math.max(html.scrollWidth, document.body ? document.body.scrollWidth : 0);
+    const H = Math.max(html.scrollHeight, document.body ? document.body.scrollHeight : 0);
+    const x = r.left + scrollX;
+    const y = r.top + scrollY;
+    return x + r.width <= 0 || y + r.height <= 0 || x >= W || y >= H;
   }
 
   /** Element is rendered, not hidden by display/visibility/opacity/content-visibility, and has a box. */
@@ -328,6 +357,34 @@ export function installMantisLib() {
     return out;
   }
 
+  /**
+   * Does `el` itself put visible pixels at viewport point (x, y)? True for replaced content and
+   * SVG, a background (color with alpha >= 0.3, or an image/gradient), its own text under the
+   * point, or a visible border when the point is on it. Transparent padding is not painting.
+   */
+  function paintsAt(el, x, y) {
+    if (el instanceof SVGElement) return true;
+    if (REPLACED.has(el.localName)) return true;
+    const s = style(el);
+    if (s.backgroundImage && s.backgroundImage !== 'none') return true;
+    const bg = parseColor(s.backgroundColor);
+    if (bg && bg[3] >= 0.3) return true;
+    for (const c of el.childNodes) {
+      if (c.nodeType === 3 && c.nodeValue.trim()) {
+        for (const r of textRects(c)) {
+          if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return true;
+        }
+      }
+    }
+    const r = el.getBoundingClientRect();
+    const edge = (side, px) => {
+      const w = parseFloat(s[`border${side}Width`]) || 0;
+      const col = parseColor(s[`border${side}Color`]);
+      return w >= 1 && col && col[3] >= 0.3 && px <= w + 1;
+    };
+    return edge('Left', x - r.left) || edge('Right', r.right - x) || edge('Top', y - r.top) || edge('Bottom', r.bottom - y);
+  }
+
   function hasOwnText(el) {
     for (const c of el.childNodes) {
       if (c.nodeType === 3 && c.nodeValue.trim() && textRects(c).length) return true;
@@ -340,7 +397,7 @@ export function installMantisLib() {
     const tag = el.localName;
     if (SKIP_TEXT_PARENTS.has(tag)) return true;
     if (el instanceof SVGElement) return true;
-    return inOverlay(el);
+    return ignored(el);
   }
 
   /** All non-empty text nodes under root, with an element parent that can render text. */
@@ -497,13 +554,17 @@ export function installMantisLib() {
   }
 
   window.__mantis = {
-    v: 3,
+    v: 4,
+    ignoreSelector,
     INTERACTIVE,
     TARGETS,
     REPLACED,
     reset,
     style,
     inOverlay,
+    ignored,
+    ariaHidden,
+    offscreen,
     isRendered,
     effectiveOpacity,
     layerKind,
@@ -523,6 +584,7 @@ export function installMantisLib() {
     visibleDocRect,
     visuallyHidden,
     clipTextRect,
+    paintsAt,
     textRects,
     hasOwnText,
     skipTextParent,

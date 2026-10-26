@@ -33,8 +33,14 @@ export default {
         return s.overflowX !== 'visible' || /paint|strict|content/.test(s.contain || '');
       });
       const skip = new Set(['script', 'style', 'template', 'noscript', 'link', 'meta']);
+      let ignoredCulprit = false;
       for (const el of [body, ...body.querySelectorAll('*')]) {
         if (skip.has(el.localName) || M.inOverlay(el)) continue;
+        if (M.ignored(el)) {
+          const r = el.getBoundingClientRect();
+          if (r.right + scrollX > limit) ignoredCulprit = true;
+          continue;
+        }
         const r = el.getBoundingClientRect();
         if (r.width === 0 && r.height === 0) continue;
         if (r.right + scrollX <= limit) continue;
@@ -58,6 +64,7 @@ export default {
         }
       }
 
+      if (culprits.length === 0 && ignoredCulprit) return [];
       const issues = [];
       const evidenceFor = (el) => {
         const r = el.getBoundingClientRect();

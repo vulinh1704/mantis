@@ -7,7 +7,8 @@
  * - spacing: an undersized target passes when a 24px circle centred on it does not intersect
  *   another target or another undersized target's circle;
  * - equivalent: checkboxes/radios with a <label> (the label is also a target) are skipped.
- * Disabled, hidden, transparent and visually-hidden (<= 2px) controls are ignored.
+ * Disabled, hidden, off-screen, transparent and visually-hidden (<= 2px) controls are ignored.
+ * Three or more failing targets of the same kind (tag + classes) are grouped into one warning.
  */
 export default {
   name: 'tap-target',
@@ -22,8 +23,8 @@ export default {
       const MIN = 24;
       const all = [];
       for (const el of document.querySelectorAll(M.TARGETS)) {
-        if (M.inOverlay(el) || !M.isRendered(el) || M.effectiveOpacity(el) < 0.1) continue;
-        if (el.matches(':disabled') || el.closest('[inert]')) continue;
+        if (M.ignored(el) || !M.isRendered(el) || M.effectiveOpacity(el) < 0.1) continue;
+        if (el.matches(':disabled') || el.closest('[inert]') || M.offscreen(el)) continue;
         const r = M.docRect(el);
         if (r.width <= 2 || r.height <= 2) continue;
         if (!M.visibleDocRect(el)) continue;
@@ -50,7 +51,7 @@ export default {
         const dy = Math.max(r.y - p.y, 0, p.y - (r.y + r.height));
         return Math.hypot(dx, dy);
       };
-      const issues = [];
+      const failing = [];
       for (const s of small) {
         const c = center(s.r);
         let nearest = null;
@@ -65,18 +66,50 @@ export default {
           }
         }
         if (!nearest) continue; // spacing exception
-        const sel = M.cssPath(s.el);
-        const near = M.cssPath(nearest.el);
-        const w = Math.round(s.r.width);
-        const h = Math.round(s.r.height);
-        issues.push({
-          type: 'tap-target',
-          severity: 'warn',
-          selector: sel,
+        failing.push({
+          el: s.el,
+          sel: M.cssPath(s.el),
+          near: M.cssPath(nearest.el),
           rect: M.round(s.r),
-          message: `Tap target \`${sel}\` is ${w}x${h}px (minimum 24x24) and sits too close to \`${near}\` to pass the spacing exception (WCAG 2.5.8).`,
-          evidence: { width: w, height: h, nearest: near, label: M.snippet(s.el.getAttribute('aria-label') || s.el.innerText || '', 40) },
+          w: Math.round(s.r.width),
+          h: Math.round(s.r.height),
+          sig: M.signature(s.el).replace(/#[^.]*/, ''),
+          label: M.snippet(s.el.getAttribute('aria-label') || s.el.innerText || '', 40),
         });
+      }
+
+      const issues = [];
+      const bySig = new Map();
+      for (const f of failing) {
+        if (!bySig.has(f.sig)) bySig.set(f.sig, []);
+        bySig.get(f.sig).push(f);
+      }
+      for (const [sig, group] of bySig) {
+        if (group.length >= 3) {
+          const first = group[0];
+          const sizes = [...new Set(group.map((g) => `${g.w}x${g.h}`))];
+          issues.push({
+            type: 'tap-target',
+            severity: 'warn',
+            dedupeKey: `tap:${sig}`,
+            selector: first.sel,
+            rect: first.rect,
+            extraRects: group.slice(1, 40).map((g) => g.rect),
+            message: `${group.length} tap targets like \`${first.sel}\` are ${sizes.slice(0, 3).join(', ')}px (minimum 24x24) and packed too close together to pass the spacing exception (WCAG 2.5.8).`,
+            evidence: { count: group.length, sizes, selectors: group.slice(0, 20).map((g) => g.sel), nearest: first.near },
+          });
+          continue;
+        }
+        for (const f of group) {
+          issues.push({
+            type: 'tap-target',
+            severity: 'warn',
+            selector: f.sel,
+            rect: f.rect,
+            message: `Tap target \`${f.sel}\` is ${f.w}x${f.h}px (minimum 24x24) and sits too close to \`${f.near}\` to pass the spacing exception (WCAG 2.5.8).`,
+            evidence: { width: f.w, height: f.h, nearest: f.near, label: f.label },
+          });
+        }
       }
       return issues;
     });
