@@ -1,0 +1,144 @@
+{
+  "$comment": "Ground truth for test/fixtures.test.js. Every bug planted in this app, with what Mantis must report. An issue matches an expectation when type, route and severity are equal and its selector is the expected selector (or a descendant selector of it, or the evidence.with element for overlaps). Cells use viewport/scheme/locale with * as wildcard; the cells reported for an expectation must be exactly these. The test also fails on any reported issue that matches no expectation.",
+  "matrix": {
+    "routes": ["/", "/settings"],
+    "viewports": ["mobile", "tablet", "desktop"],
+    "schemes": ["light", "dark"],
+    "locales": ["en", "vi"]
+  },
+  "bugs": [
+    {
+      "id": "promo-overflow",
+      "route": "/",
+      "title": "Promo banner has a fixed 600px width",
+      "where": "styles.css .promo { width: 600px }",
+      "fix": "max-width: 600px (clean-app)",
+      "expect": [
+        { "type": "page-overflow", "severity": "error", "selector": "#promo-banner", "cells": "mobile/*/*" }
+      ]
+    },
+    {
+      "id": "nav-clip-vi",
+      "route": "/",
+      "title": "Nav kept on one line with overflow:hidden; the longer Vietnamese labels are cut off",
+      "where": "styles.css .nav-links { max-width: 420px; overflow: hidden; white-space: nowrap }",
+      "fix": "let the nav wrap (flex-wrap: wrap), no max-width / overflow:hidden",
+      "expect": [
+        { "type": "clipped-text", "severity": "error", "selector": "#nav-links", "cells": "desktop/*/vi" }
+      ]
+    },
+    {
+      "id": "header-overlap",
+      "route": "/",
+      "title": "Menu toggle absolutely positioned on top of the header CTA on phones",
+      "where": "styles.css @media (max-width: 639px) .menu-toggle { position: absolute; right: 12px; top: 12px }",
+      "fix": "keep the toggle in the flex row",
+      "expect": [
+        { "type": "overlap", "severity": "error", "selector": "#menu-toggle", "with": "#header-cta", "cells": "mobile/*/*" }
+      ]
+    },
+    {
+      "id": "late-hero-shift",
+      "route": "/",
+      "title": "Hero image lazy-loaded after first paint without width/height",
+      "where": "index.html #hero-art (data-src, no width/height) + app.js",
+      "fix": "width/height attributes (aspect ratio reserved) and a real src",
+      "expect": [
+        { "type": "layout-shift", "severity": "warn", "selector": "#hero-art", "cells": "*/*/*" }
+      ]
+    },
+    {
+      "id": "hero-note-contrast",
+      "route": "/",
+      "title": "Small print in #aaa on white",
+      "where": "styles.css .hero-note { color: #aaa }",
+      "fix": "color: var(--muted)",
+      "expect": [
+        { "type": "contrast", "severity": "error", "selector": "#hero-note", "cells": "*/light/*" }
+      ]
+    },
+    {
+      "id": "card-theme-leak",
+      "route": "/",
+      "title": "Business pricing card hard-codes background #fff; in dark mode its light text becomes invisible",
+      "where": "styles.css #plan-business { background: #fff }",
+      "fix": "use var(--surface) like the other cards",
+      "expect": [
+        { "type": "theme-leak", "severity": "error", "selector": "#plan-business", "cells": "*/dark/*" },
+        { "type": "contrast", "severity": "error", "selector": "#plan-business", "descendants": true, "minIssues": 5, "cells": "*/dark/*" }
+      ]
+    },
+    {
+      "id": "badge-covers-cta",
+      "route": "/",
+      "title": "\"Most popular\" badge moved to the bottom of the card on phones, on top of the CTA label",
+      "where": "styles.css @media (max-width: 639px) .badge { bottom: 30px; left: 50% }",
+      "fix": "keep the badge at the top corner",
+      "expect": [
+        { "type": "overlap", "severity": "error", "selector": "#popular-badge", "with": "#plan-pro-cta", "cells": "mobile/*/*" }
+      ]
+    },
+    {
+      "id": "missing-image",
+      "route": "/",
+      "title": "Testimonial photo points at a file that was never uploaded",
+      "where": "index.html #team-photo src=/img/team.jpg",
+      "fix": "src=/img/team.svg",
+      "expect": [
+        { "type": "broken-image", "severity": "error", "selector": "#team-photo", "cells": "*/*/*" },
+        { "type": "request-failed", "severity": "warn", "message": "/img/team\\.jpg returned HTTP 404", "cells": "*/*/*" }
+      ]
+    },
+    {
+      "id": "newsletter-btn-clip",
+      "route": "/",
+      "title": "Subscribe button has a fixed width with overflow:hidden; \"Đăng ký nhận bản tin\" is cut",
+      "where": "styles.css #newsletter-submit { width: 120px; overflow: hidden; white-space: nowrap }",
+      "fix": "no fixed width; the form stacks on phones",
+      "expect": [
+        { "type": "clipped-text", "severity": "error", "selector": "#newsletter-submit", "cells": "*/*/vi" }
+      ]
+    },
+    {
+      "id": "social-tap-targets",
+      "route": "/",
+      "title": "Footer social links are bare 16x16 icons 6px apart",
+      "where": "styles.css .social a { width: 16px; height: 16px }",
+      "fix": "40x40 targets",
+      "expect": [
+        { "type": "tap-target", "severity": "warn", "selector": "#social-links", "descendants": true, "minIssues": 3, "cells": "mobile/*/*" }
+      ]
+    },
+    {
+      "id": "settings-js-error",
+      "route": "/settings",
+      "title": "settings.js still queries the old #save-btn id and throws on load",
+      "where": "settings.js document.querySelector('#save-btn').addEventListener",
+      "fix": "query #save-settings and guard against null",
+      "expect": [
+        { "type": "console", "severity": "error", "message": "TypeError: Cannot read properties of null", "cells": "*/*/*" }
+      ]
+    },
+    {
+      "id": "save-button-wrap",
+      "route": "/settings",
+      "title": "Save button has a fixed 84px width; \"Lưu tất cả thay đổi\" wraps onto 3+ lines",
+      "where": "styles.css #save-settings { width: 84px }",
+      "fix": "no fixed width, white-space: nowrap",
+      "expect": [
+        { "type": "clipped-text", "severity": "warn", "selector": "#save-settings", "cells": "*/*/vi" }
+      ]
+    },
+    {
+      "id": "danger-title-leak",
+      "route": "/settings",
+      "title": "Danger-zone heading hard-codes #7f1d1d; unreadable on the dark danger card",
+      "where": "styles.css #danger-title { color: #7f1d1d }",
+      "fix": "color: var(--danger-ink)",
+      "expect": [
+        { "type": "theme-leak", "severity": "error", "selector": "#danger-title", "cells": "*/dark/*" },
+        { "type": "contrast", "severity": "error", "selector": "#danger-title", "cells": "*/dark/*" }
+      ]
+    }
+  ]
+}
