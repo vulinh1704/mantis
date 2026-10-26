@@ -1,0 +1,5 @@
+node_modules/
+.mantis/
+test-results/
+*.log
+.DS_Store
