@@ -43,9 +43,11 @@ in <out>/latest.
                                that disappeared is a lost warning
 
 proof: side-by-side before/after sheet of two runs (run dirs, or the aliases
-latest / prev / first under .mantis), written to --out (default .mantis/proof.png).
+latest / prev / first under .mantis), written to --out (default .mantis/proof.png),
+plus a close-up of one fixed finding at the same coordinates (<out>-zoom.png).
 --video records a short visit of both URLs (load, scroll, switch to dark) and
-stacks them into one MP4 next to --out (default .mantis/proof.mp4) with ffmpeg;
+stacks them into one MP4 next to --out (default .mantis/proof.mp4) with ffmpeg,
+between a title card and a closing receipt when the two runs are given too;
 without ffmpeg the two raw .webm recordings are kept instead.
 
 Exit codes: 0 no errors · 1 error-level issues found · 2 crash, unreachable URL or bad usage
@@ -108,6 +110,7 @@ export async function main(argv = process.argv.slice(2), { stdout = process.stdo
       const opts = parseProofArgs(rest);
       const res = await proof(opts, { log: err });
       if (res.png) out(`proof   ${rel(res.png)}  (errors ${res.before.errors} -> ${res.after.errors}, warnings ${res.before.warnings} -> ${res.after.warnings})`);
+      if (res.zoom) out(`zoom    ${rel(res.zoom)}`);
       if (res.video) out(`video   ${rel(res.video)}`);
       return 0;
     }
