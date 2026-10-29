@@ -50,6 +50,10 @@ README for how it reaches a dev server on the host).
   switches themes before choosing.
 - Keep the default screens (mobile 360, tablet 768, desktop 1440). Never drop
   mobile to make a report pass.
+- Before you change styles, run `mantis learn <url>` (same routes) on the
+  unchanged app when `.mantis/style.json` doesn't exist yet. Every later `look`
+  then reports `off-style` warnings: colors, font sizes and radii that are near
+  copies of the house values, and fonts the app uses nowhere else.
 - Exit code: `0` no errors, `1` errors found, `2` the page could not be loaded
   (is the server up, on that port?).
 

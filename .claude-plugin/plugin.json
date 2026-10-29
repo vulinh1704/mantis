@@ -1,6 +1,6 @@
 {
   "name": "mantis",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Gives your coding agent eyes for UI work: checks every screen, theme and language in a real browser, fixes what is broken at the root, and proves it with before/after screenshots.",
   "author": {
     "name": "Truong Dang Vu Linh",

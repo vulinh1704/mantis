@@ -164,6 +164,7 @@ const LOCALE_RE = /^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$/;
  * @property {string[]} ignore  CSS selectors excluded from every detector (plus [data-mantis-ignore]).
  * @property {string} baseline  run to compare with: 'auto' (previous run of the same URL), 'none' or a run directory.
  * @property {string|null} storageState  Playwright storage state file every cell starts with (cookies + localStorage).
+ * @property {string} style  house style to check against: 'auto' (<out>/style.json when it exists), 'none' or a file.
  */
 
 /**
@@ -192,6 +193,7 @@ export function parseLookArgs(argv) {
         ignore: { type: 'string', multiple: true },
         baseline: { type: 'string' },
         'storage-state': { type: 'string' },
+        style: { type: 'string' },
       },
     });
   } catch (err) {
@@ -255,6 +257,58 @@ export function parseLookArgs(argv) {
     ignore: (values.ignore ?? []).map((s) => s.trim()).filter(Boolean),
     baseline: parseBaseline(values.baseline),
     storageState: parseStorageStatePath(values['storage-state']),
+    style: parseStyleChoice(values.style),
+  };
+}
+
+function parseStyleChoice(value) {
+  if (value === undefined) return 'auto';
+  const v = value.trim();
+  if (!v) throw new UsageError('--style is empty (use auto, none or a style.json file)');
+  return v;
+}
+
+/**
+ * @typedef {object} LearnOptions
+ * @property {string} url
+ * @property {URL} baseUrl
+ * @property {string[]} routes
+ * @property {Viewport[]} viewports
+ * @property {('light'|'dark')[]} schemes
+ * @property {DarkStrategy} darkStrategy
+ * @property {string} out
+ * @property {number} wait
+ * @property {number} concurrency
+ * @property {number} timeout
+ * @property {string[]} ignore
+ * @property {string|null} storageState
+ */
+
+/**
+ * Parse `mantis learn` arguments: the same as `look`, without the options that only make sense
+ * for a check (locales, baseline, style, json).
+ * @param {string[]} argv
+ * @returns {LearnOptions}
+ */
+export function parseLearnArgs(argv) {
+  for (const a of argv) {
+    const m = /^--(locales|baseline|style|json)(=|$)/.exec(a);
+    if (m) throw new UsageError(`--${m[1]} is a look option; learn measures the first locale of every route`);
+  }
+  const o = parseLookArgs(argv);
+  return {
+    url: o.url,
+    baseUrl: o.baseUrl,
+    routes: o.routes,
+    viewports: o.viewports,
+    schemes: o.schemes,
+    darkStrategy: o.darkStrategy,
+    out: o.out,
+    wait: o.wait,
+    concurrency: o.concurrency,
+    timeout: o.timeout,
+    ignore: o.ignore,
+    storageState: o.storageState,
   };
 }
 
