@@ -6,10 +6,9 @@
  *   fixed-position layers and anything clipped by an overflow ancestor. When several siblings
  *   overflow the same parent the parent is reported once (e.g. a nowrap flex row), which is where
  *   the fix usually goes.
- * - The overflow is masked: `overflow-x: hidden/clip` on html, body or an app root (up to two
- *   levels below body, full width, at least half the page tall) cuts the same culprits off at the
- *   viewport edge instead of letting
- *   the page scroll. That hides the symptom, not the bug, so it is reported the same way with the
+ * - The overflow is masked: `overflow-x: hidden/clip` on html, body or an app root (up to four
+ *   levels below body, as in `#root > .app > .editor`, full width, at least half the page tall)
+ *   cuts the same culprits off at the viewport edge instead of letting the page scroll. That hides the symptom, not the bug, so it is reported the same way with the
  *   masking rule as evidence. Only culprits that start inside the viewport and carry text, a
  *   control or media count; aria-hidden decoration, transformed layers (carousels, off-canvas
  *   drawers) and anything clipped by a smaller container are left alone.
@@ -32,13 +31,17 @@ export default {
       const viewportMask = hides(hs) ? { selector: 'html', value: hs.overflowX } : hides(bs) ? { selector: 'body', value: bs.overflowX } : null;
       const docHeight = Math.max(html.scrollHeight, body.scrollHeight);
       const roots = new Map();
-      for (const a of body.children) {
-        for (const n of [a, ...a.children]) {
-          if (M.inOverlay(n) || !hides(M.style(n))) continue;
+      // App shells nest: body > #root > .app > .editor. Only full-width, page-tall boxes qualify.
+      const findRoots = (parent, depth) => {
+        for (const n of parent.children) {
+          if (M.inOverlay(n)) continue;
           const r = n.getBoundingClientRect();
-          if (r.left <= 1 && r.right >= vw - 1 && r.height >= docHeight / 2) roots.set(n, { selector: M.cssPath(n), value: M.style(n).overflowX });
+          if (r.left > 1 || r.right < vw - 1 || r.height < docHeight / 2) continue;
+          if (hides(M.style(n))) roots.set(n, { selector: M.cssPath(n), value: M.style(n).overflowX });
+          if (depth < 4) findRoots(n, depth + 1);
         }
-      }
+      };
+      findRoots(body, 1);
       const scrolls = docWidth > vw + 1 && !viewportMask;
       if (!scrolls && !viewportMask && roots.size === 0) return [];
 
@@ -63,8 +66,11 @@ export default {
       };
       const hasContent = (el) => M.REPLACED.has(el.localName) || el.matches(M.TARGETS) ||
         !!el.querySelector(`${M.TARGETS}, img, svg, video, canvas, picture`) || /\S/.test(el.innerText || '');
+      // Logo strips and tickers: a never-ending animation inside means the overflow is the design.
+      const marquee = (el) => typeof el.getAnimations === 'function' &&
+        el.getAnimations({ subtree: true }).some((a) => a.effect && a.effect.getComputedTiming().iterations === Infinity);
       // A masked culprit only matters when the user would see it cut: it starts on screen and has content.
-      const visiblyCut = (el, r) => r.left + scrollX < vw - 1 && !M.ariaHidden(el) && !transformed(el) && hasContent(el);
+      const visiblyCut = (el, r) => r.left + scrollX < vw - 1 && !M.ariaHidden(el) && !transformed(el) && !marquee(el) && hasContent(el);
 
       const over = new Set();
       const culprits = [];
@@ -80,7 +86,7 @@ export default {
         const r = el.getBoundingClientRect();
         if (r.width === 0 && r.height === 0) continue;
         if (r.right + scrollX <= limit) continue;
-        if (M.layerKind(el) === 'fixed') continue;
+        if (M.layerKind(el) === 'fixed' || M.visuallyHidden(el)) continue;
         const clip = el === body ? viewportMask || 'none' : clipOf(el);
         if (clip === 'clipped' || (clip === 'none' && !scrolls)) continue;
         over.add(el);
@@ -93,7 +99,7 @@ export default {
       if (culprits.length === 0) {
         for (const t of M.textNodes(body, 8000)) {
           const owner = t.parentElement;
-          if (M.layerKind(owner) === 'fixed') continue;
+          if (M.layerKind(owner) === 'fixed' || M.visuallyHidden(owner)) continue;
           const clip = clipOf(owner);
           if (clip === 'clipped' || (clip === 'none' && !scrolls)) continue;
           if (clip !== 'none' && (M.ariaHidden(owner) || transformed(owner))) continue;

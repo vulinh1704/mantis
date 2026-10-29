@@ -89,6 +89,29 @@ describe('page-overflow', () => {
     assert.deepEqual(sels(issues), ['#row']);
   });
 
+  test('a deep app shell that clips the overflow still gets the culprit reported', async () => {
+    // body > #root > .app > .editor { overflow: hidden }: controls pushed past the edge are cut off.
+    const shell = `
+      <div id="root"><div class="app"><div class="editor" style="position:relative;overflow:hidden;width:100%;height:100vh">
+        <div style="position:absolute;top:0;left:16px;right:16px;display:flex;gap:8px">
+          <div style="flex:none;width:300px">Tools</div>
+          <div id="right" style="display:flex;gap:8px;flex:none"><button style="width:60px">Share</button><button style="width:60px">Library</button></div>
+        </div>
+      </div></div></div>`;
+    const issues = await detect(pageOverflow, shell, { viewport: 'mobile' });
+    assert.deepEqual(sels(issues), ['#right']);
+    assert.match(issues[0].evidence.maskedBy, /editor/);
+  });
+
+  test('a masked app shell stays quiet on screen-reader text and on a marquee', async () => {
+    const shell = (inner) => `<div id="root"><div class="app"><main style="overflow-x:clip;width:100%;min-height:100vh">${inner}</main></div></div>`;
+    const srOnly = '<p>Pricing <span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap">for teams of every size, billed monthly or yearly</span></p>';
+    assert.deepEqual(await detect(pageOverflow, shell(srOnly), { viewport: 'mobile' }), []);
+    const logos = Array.from({ length: 8 }, (_, i) => `<span style="flex:none;width:90px">Logo ${i}</span>`).join('');
+    const marquee = `<div style="display:flex;gap:10px;width:max-content;animation:slide 20s linear infinite">${logos}</div>`;
+    assert.deepEqual(await detect(pageOverflow, shell(marquee), { viewport: 'mobile', css: '@keyframes slide{from{margin-left:0}to{margin-left:-400px}}' }), []);
+  });
+
   test('quiet when overflow is clipped by a component, scrollable or fixed', async () => {
     assert.deepEqual(await detect(pageOverflow, '<div style="overflow-x:auto"><div style="width:900px">scroller</div></div>', { viewport: 'mobile' }), []);
     assert.deepEqual(await detect(pageOverflow, '<div style="overflow:hidden"><div style="width:900px">clipped</div></div><p style="height:900px">rest of the page</p>', { viewport: 'mobile' }), []);
