@@ -103,13 +103,37 @@ export function splitList(value) {
 }
 
 /**
- * Normalise routes: `settings` -> `/settings`; full URLs are reduced to path+query when same-origin.
+ * Git Bash (MSYS) rewrites an argument that starts with "/" into a Windows path before Node sees
+ * it: `--routes /,/settings` arrives as `C:/Program Files/Git/,/settings`. Turn such a path back
+ * into the route; any other Windows path is a usage error.
+ * @param {string} route
+ * @param {Record<string, string|undefined>} [env]
+ */
+export function undoMsysPath(route, env = process.env) {
+  if (!/^[A-Za-z]:[\\/]/.test(route)) return route;
+  const p = route.replace(/\\/g, '/');
+  const roots = [];
+  if (env.EXEPATH) roots.push(env.EXEPATH.replace(/\\/g, '/').replace(/\/(usr\/)?bin\/?$/i, ''));
+  const m = /^[A-Za-z]:\/(?:[^/]+\/)*?(?:Git|PortableGit|msys64|msys32)(?=\/|$)/i.exec(p);
+  if (m) roots.push(m[0]);
+  for (const root of roots) {
+    const r = root.replace(/\/$/, '').toLowerCase();
+    const lower = p.toLowerCase();
+    if (lower === r || lower.startsWith(`${r}/`)) return `/${p.slice(r.length).replace(/^\//, '')}`;
+  }
+  throw new UsageError(`route "${route}" is a Windows path. Git Bash rewrites arguments that start with "/": pass full URLs (--routes http://localhost:3000/settings) or set MSYS_NO_PATHCONV=1`);
+}
+
+/**
+ * Normalise routes: `settings` -> `/settings`; full URLs are reduced to path+query when same-origin;
+ * Windows paths that Git Bash made out of routes are turned back into routes.
  * @param {string[]} routes
  * @param {URL} base
  */
 export function normalizeRoutes(routes, base) {
   const out = [];
-  for (const r of routes) {
+  for (const raw of routes) {
+    const r = undoMsysPath(raw);
     let route;
     if (/^https?:\/\//i.test(r)) {
       const u = new URL(r);
