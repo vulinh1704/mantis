@@ -6,7 +6,7 @@ import { styleCounts } from './style.js';
 import { proof } from './proof.js';
 import { VERSION } from './util.js';
 
-export const HELP = `mantis ${VERSION} — gives your coding agent eyes for UI work
+export const HELP = `mantis ${VERSION} — catches the UI bugs your coding agent can't see, and the ones it hides
 
 Usage
   mantis look <url> [options]
