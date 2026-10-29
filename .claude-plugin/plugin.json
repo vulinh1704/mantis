@@ -9,13 +9,5 @@
   "homepage": "https://github.com/vulinh1704/mantis",
   "repository": "https://github.com/vulinh1704/mantis",
   "license": "MIT",
-  "keywords": [
-    "ui",
-    "frontend",
-    "visual-qa",
-    "responsive",
-    "dark-mode",
-    "accessibility",
-    "playwright"
-  ]
+  "keywords": ["ui", "frontend", "visual-qa", "responsive", "dark-mode", "accessibility", "playwright"]
 }
