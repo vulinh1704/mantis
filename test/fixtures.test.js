@@ -127,15 +127,21 @@ describe('fixtures (end-to-end)', { concurrency: false }, () => {
     assert.match(res.stdout, new RegExp(`errors ${runs.buggy.report.summary.errors} -> 0, warnings ${runs.buggy.report.summary.warnings} -> 0`));
     const size = pngSize(file);
     assert.ok(size.width > 900 && size.height > 600, `proof is ${size.width}x${size.height}`);
+    const zoom = file.replace(/\.png$/, '-zoom.png');
+    assert.match(res.stdout, /zoom {4}.*proof-zoom\.png/);
+    const zoomSize = pngSize(zoom);
+    assert.ok(zoomSize.width > 1000 && zoomSize.height > 500, `close-up is ${zoomSize.width}x${zoomSize.height}`);
   });
 
-  test('proof --video stacks BEFORE/AFTER recordings into one MP4', { timeout: 180000 }, async (t) => {
+  test('proof --video stacks BEFORE/AFTER recordings into one MP4, between title and closing cards', { timeout: 180000 }, async (t) => {
     if (!(await hasFfmpeg())) {
       t.skip('ffmpeg is not installed');
       return;
     }
+    assert.ok(runs.buggy && runs.clean, 'needs both fixture runs');
     const file = path.join(tmp, 'video', 'proof.png');
-    const res = await runCli(['proof', '--video', '--before-url', `${buggy.url}/`, '--after-url', `${clean.url}/`, '--out', file]);
+    const before = path.join(runs.buggy.out, 'runs', runs.buggy.report.runId);
+    const res = await runCli(['proof', '--before', before, '--after', path.join(runs.clean.out, 'latest'), '--video', '--before-url', `${buggy.url}/`, '--after-url', `${clean.url}/`, '--out', file]);
     assert.equal(res.code, 0, res.stderr);
     const mp4 = file.replace(/\.png$/, '.mp4');
     assert.ok(existsSync(mp4), 'mp4 written');

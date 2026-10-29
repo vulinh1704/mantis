@@ -62,7 +62,7 @@ function initials(name) {
 }
 
 /** "MANTIS × <project>" with the project's logo or a monogram in its brand color. */
-function kicker(project, url) {
+export function kickerHtml(project, url) {
   const name = project?.name;
   if (!name) return `<div class="kicker">${markSvg(22)}<span>Mantis</span><i>·</i><span>${escapeHtml(hostOf(url))}</span></div>`;
   const logo = project.logo
@@ -81,7 +81,8 @@ export function arrowValue(before, after, tone) {
   return `<small>${before}</small><i>&rarr;</i><strong class="${tone}">${after}</strong>`;
 }
 
-function qrCard(project) {
+/** QR code to the project's repo with its owner/repo slug, or '' without a repo. */
+export function qrCardHtml(project) {
   if (!project?.repo || project.qr === false) return '';
   return `<div class="qr">${qrSvg(project.repo.url, { size: 104 })}<span>${escapeHtml(project.repo.slug)}</span></div>`;
 }
@@ -93,12 +94,12 @@ function qrCard(project) {
 export function headerHtml({ project, url, title, round, summary, meta, stats }) {
   return `<header>
   <div class="who">${mascotStamp(116)}<div class="titles">
-    ${kicker(project, url)}
+    ${kickerHtml(project, url)}
     <h1><span class="uline">${escapeHtml(title)}</span>${round}</h1>
     <p class="summary">${summary}</p>
     <div class="meta">${meta}</div>
   </div></div>
-  <div class="side"><div class="totals">${stats}</div>${qrCard(project)}</div>
+  <div class="side"><div class="totals">${stats}</div>${qrCardHtml(project)}</div>
 </header>`;
 }
 

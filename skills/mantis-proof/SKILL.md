@@ -27,6 +27,10 @@ No before run yet? Check out the base branch in a separate worktree
 mantis proof --before .mantis/runs/<before> --after .mantis/runs/<after> --out mantis-proof.png
 ```
 
+It also writes `mantis-proof-zoom.png`: a close-up of one finding that was fixed,
+cut from both screenshots at the same coordinates and circled. Use it in the PR
+description when the full sheet is too small to read.
+
 When the after run was compared with the before run (it was the previous run, or
 `mantis look --baseline <before>`), the sheet also shows fixed, new and cover-up
 counts. The sheet carries the project's name and repo link (from package.json and
@@ -40,6 +44,9 @@ With both versions running:
 ```bash
 mantis proof --video --before-url http://localhost:3001 --after-url http://localhost:3000
 ```
+
+Add `--before <run> --after <run>` to the same command and the video opens with a
+title card and ends with the receipt (errors before → after, cover-ups).
 
 If `mantis` isn't installed, use `npx -y @vulinh1704/mantis …`.
 

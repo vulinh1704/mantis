@@ -58,8 +58,8 @@ Then someone opens the page on a phone:
 2. **Fix.** `/mantis-fix` fixes causes, not symptoms. It never puts
    `overflow-x: hidden` on the body, shrinks text until it fits, or turns dark
    mode off, and the next run checks that it didn't.
-3. **Prove.** `/mantis-proof` makes a before/after sheet, and optionally a
-   video, for your pull request.
+3. **Prove.** `/mantis-proof` makes a before/after sheet, a close-up of one
+   fixed finding, and optionally a video, for your pull request.
 
 ```bash
 mantis look http://localhost:3000 --routes /,/settings --locales en,vi
