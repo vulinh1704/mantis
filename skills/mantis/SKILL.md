@@ -6,8 +6,9 @@ description: >
   what is actually broken: page overflow, cut-off text, overlapping controls,
   unreadable contrast, dark-mode leaks, tiny tap targets, console errors, broken
   images, layout shift. Use after any frontend change, before saying a UI task is
-  done, or when the user says "check the UI", "does it work on mobile",
-  "dark mode looks off", /mantis.
+  done, when a UI, layout or screenshot check fails (a red check:ui, a failing
+  mobile e2e test, a release blocked by one), or when the user says "check the
+  UI", "does it work on mobile", "dark mode looks off", /mantis.
 ---
 
 # Mantis
