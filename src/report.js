@@ -184,7 +184,7 @@ const typeRank = (t) => {
  * @param {object|null} [p.baseline]  comparison with an earlier run (compare.js summarize)
  * @param {object|null} [p.project]  name, logo, brand color and repo for the sheets (project.js)
  */
-export function buildReport({ version, runId, startedAt, finishedAt, options, cells, issues, notes, baseline = null, project = null }) {
+export function buildReport({ version, runId, startedAt, finishedAt, options, cells, issues, notes, baseline = null, project = null, style = null }) {
   const routeOrder = options.routes;
   const cellByKey = new Map(cells.map((c) => [`${c.route}|${c.key}`, c]));
   for (const c of cells) {
@@ -224,6 +224,7 @@ export function buildReport({ version, runId, startedAt, finishedAt, options, ce
     durationMs: finishedAt - startedAt,
     url: options.url,
     project,
+    style,
     matrix: {
       routes: routeOrder,
       viewports: options.viewports.map((v) => ({ name: v.name, width: v.width, height: v.height })),
@@ -294,6 +295,10 @@ export function renderMarkdown(report, { maxPerType = 30 } = {}) {
   }
   lines.push('');
   lines.push('E = errors, W = warnings, n/l = not localized (same text as the first locale). Each issue is numbered on the screenshots in `shots/`; cells read `viewport/scheme/locale` (`*` = all).', '');
+
+  if (report.style) {
+    lines.push(`Checked against the house style in \`${report.style.file}\` (learned ${formatLocalTime(report.style.learnedAt)} from \`${report.style.url}\`).`, '');
+  }
 
   const b = report.baseline;
   if (b) {

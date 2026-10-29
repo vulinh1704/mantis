@@ -14,6 +14,19 @@ description: >
 Fix the cause, not the symptom. One wrong token can break twenty components; fix
 the token once.
 
+## Use the house style
+
+Read `.mantis/style.json` (or `style.md`) before you write CSS. When it doesn't
+exist, run `mantis learn <url>` on the unchanged app first: it records the
+colors, CSS variables, font sizes, radii and spacing the app already uses.
+
+- Reuse a house value, by its token when it has one: `var(--primary)`, not the
+  hex it resolves to, and not a new shade that looks close.
+- Need a value the app doesn't have yet? Say so and propose one token, instead of
+  hard-coding it in one place.
+- Every `off-style` warning is a near copy of a house value (or a foreign font).
+  Replace it with the house value it names.
+
 ## Loop
 
 1. Start from `.mantis/latest/report.md`. No report yet: run the **mantis** skill

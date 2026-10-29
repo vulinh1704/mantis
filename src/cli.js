@@ -1,6 +1,8 @@
 import path from 'node:path';
+import { learn } from './learn.js';
 import { BrowserError, UnreachableError, look } from './look.js';
-import { UsageError, parseLookArgs, parseProofArgs } from './options.js';
+import { UsageError, parseLearnArgs, parseLookArgs, parseProofArgs } from './options.js';
+import { styleCounts } from './style.js';
 import { proof } from './proof.js';
 import { VERSION } from './util.js';
 
@@ -8,6 +10,7 @@ export const HELP = `mantis ${VERSION} — gives your coding agent eyes for UI w
 
 Usage
   mantis look <url> [options]
+  mantis learn <url> [options]
   mantis proof --before <runDir> --after <runDir> [--out <file.png>]
                [--video --before-url <url> --after-url <url> [--viewport mobile]
                 [--dark-strategy media|class:dark|attr:data-theme=dark]
@@ -47,6 +50,17 @@ in <out>/latest.
                                behind a login or onboarding. Make one with
                                npx playwright codegen --save-storage=<file> <url>
                                or write the JSON by hand; keep it out of git
+  --style auto|none|<file>     house style to check against (default auto:
+                               <out>/style.json when mantis learn wrote one).
+                               Colors, font sizes and radii a hair off the house
+                               values, and fonts used nowhere else, are off-style
+                               warnings
+
+learn: measure the house style of the running app (colors per scheme with their
+CSS tokens, font sizes, fonts, weights, radii, spacing, shadows, motion) on every
+route x viewport x scheme, and write <out>/style.json, style.md and style.png.
+Rarely used values a hair away from a common one are listed as near-duplicates.
+Takes the look options except --locales, --baseline, --style and --json.
 
 proof: side-by-side before/after sheet of two runs (run dirs, or the aliases
 latest / prev / first under .mantis), written to --out (default .mantis/proof.png),
@@ -108,6 +122,23 @@ export async function main(argv = process.argv.slice(2), { stdout = process.stdo
       }
       return res.exitCode;
     }
+    if (cmd === 'learn') {
+      if (rest.includes('-h') || rest.includes('--help')) {
+        out(HELP);
+        return 0;
+      }
+      const opts = parseLearnArgs(rest);
+      err(`mantis learn ${opts.url} · routes ${opts.routes.join(',')} · ${opts.viewports.map((v) => v.name).join(',')} · ${opts.schemes.join(',')}`);
+      const res = await learn(opts, { log: err });
+      const s = res.style;
+      out('');
+      out(`House style: ${styleCounts(s)}`);
+      out(`  ${s.drift.length} near-duplicate${s.drift.length === 1 ? '' : 's'}${s.drift.length ? `: ${s.drift.slice(0, 3).map((d) => `${d.value} ≈ ${d.near}`).join(', ')}${s.drift.length > 3 ? ', …' : ''}` : ''}`);
+      out(`  style   ${rel(res.files.json)}`);
+      out(`  notes   ${rel(res.files.md)}`);
+      if (res.files.png) out(`  sheet   ${rel(res.files.png)}`);
+      return 0;
+    }
     if (cmd === 'proof') {
       if (rest.includes('-h') || rest.includes('--help')) {
         out(HELP);
@@ -120,7 +151,7 @@ export async function main(argv = process.argv.slice(2), { stdout = process.stdo
       if (res.video) out(`video   ${rel(res.video)}`);
       return 0;
     }
-    throw new UsageError(`unknown command "${cmd}" (use look or proof)`);
+    throw new UsageError(`unknown command "${cmd}" (use look, learn or proof)`);
   } catch (e) {
     if (e instanceof UsageError) {
       err(`mantis: ${e.message}`);

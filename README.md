@@ -49,6 +49,7 @@ Then someone opens the page on a phone:
 | Tiny tap targets | 16px icon buttons on a phone | A mouse is precise, a thumb isn't |
 | Console errors, broken images | Red errors, empty boxes | Nobody opened DevTools |
 | Layout shift | Content jumps while you read | Everything loads instantly on localhost |
+| Off-style values | A blue one shade off your brand, a 15px corner among 16px ones | They hard-code a value instead of using your token |
 
 ## How it works
 
@@ -92,6 +93,30 @@ Mantis: 0 errors, 0 warnings in 24 cells
   vs 2026-10-29T11-51-22: 18 fixed · 0 new · 0 cover-ups · 0 lost
 ```
 
+## Mantis has no taste. It has yours.
+
+`mantis learn` opens the running app and measures the house style it actually uses, with no design spec to write first:
+- the colors in each theme, with the CSS variables behind them;
+- font sizes, fonts and weights;
+- corner radii, spacing, shadows and motion timing.
+
+```bash
+mantis learn http://localhost:3000 --routes /,/settings
+```
+
+It writes `.mantis/style.json` for the agent, `style.md` for people, and a `style.png` sheet. From then on, `look` checks every page against that style. It warns `off-style` when a page uses:
+- a color within ΔE 5 of a house color without being one of them, such as a hard-coded copy of `--primary`;
+- a font size or corner radius a pixel or two off the house values;
+- a font the app uses nowhere else.
+
+Values far from everything are left alone, since a new illustration color can be on purpose. The sheet also lists the near-duplicates already in the app.
+
+<p align="center">
+  <img src="assets/style.png" width="880" alt="A Mantis house-style sheet: the light and dark palettes with their CSS tokens, the type scale in the app's own words, corner radii, spacing and near-duplicate colors">
+</p>
+
+`/mantis-fix` reads `style.json` before it writes CSS and reuses the house values instead of inventing new ones.
+
 ## Your project on the sheets
 
 The contact sheet and the proof carry your project's name and a link and QR code
@@ -121,7 +146,7 @@ The file holds a live session, so keep it out of git (add `.mantis/` to your `.g
 
 ## Install
 
-> Mantis is in early development (v0.2). Expect rough edges, and please [open an issue](https://github.com/vulinh1704/mantis/issues) when it gets something wrong.
+> Mantis is in early development (v0.3). Expect rough edges, and please [open an issue](https://github.com/vulinh1704/mantis/issues) when it gets something wrong.
 
 **Claude Code**
 
@@ -179,6 +204,13 @@ What has been measured so far:
   stripe.com), 18 of the 21 errors it reported held up when checked by hand.
   The 3 false positives were demo frames on tailwindcss.com. Checked on
   2026-10-26.
+- **House style.** On `buggy-app`, `mantis learn` lists exactly the 3 near-duplicates planted there:
+  - a color ΔE 0.4 from `--muted`;
+  - a 13.6px label in a 14px scale;
+  - a 15px corner next to `--radius: 16px`.
+
+  On `clean-app` it finds none. Each of four near copies hard-coded into `clean-app` (a color, a font size, a radius and a font) gives one `off-style` warning; a clearly new color gives none. These checks run in CI.
+- **Off-style false alarms.** Learning a public page and looking at it again right away gave 0 off-style warnings on tailwindcss.com and vercel.com. stripe.com gave 2, linear.app 4 and github.com 4. All 10 were inside live product demos or a lazily loaded repo grid, whose content changes between loads. Checked on 2026-10-29.
 
 Still to come is the agent benchmark: the same agent on the same tasks, with
 and without Mantis, several runs each. We will publish the method, the tasks and
@@ -193,6 +225,9 @@ the misses, not only the wins.
 - Cover-up checks need a previous run of the same URL to compare with. Layout
   shift, console and network issues change by themselves on live pages, so they
   are not checked for cover-ups.
+- Off-style compares values, not intent. Content that changes between loads,
+  such as product demos, carousels and feeds, can show values the learn run
+  never saw. Leave such regions out with `--ignore`.
 
 ## Why a mantis shrimp?
 

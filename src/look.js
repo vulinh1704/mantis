@@ -25,6 +25,7 @@ import {
 } from './page.js';
 import { IssueRegistry, buildReport, renderMarkdown } from './report.js';
 import { projectInfo } from './project.js';
+import { loadStyle } from './style.js';
 import { VERSION, deferred, firstLine, pool, runIdFor, sha1, uniqueDir } from './util.js';
 
 /** The URL could not be reached at all (exit code 2). */
@@ -70,7 +71,7 @@ export async function launchBrowser() {
   }
 }
 
-async function preflight(browser, url, session) {
+export async function preflight(browser, url, session) {
   const context = await browser.newContext({ ignoreHTTPSErrors: true, ...(session ? { storageState: session } : {}) });
   try {
     await context.request.get(url, { timeout: 20000, failOnStatusCode: false, maxRedirects: 10 });
@@ -253,6 +254,7 @@ export async function look(opts, { log = () => {} } = {}) {
   const startedAt = new Date();
   const session = opts.storageState ? await readStorageState(opts.storageState) : null;
   const base = await findBaseline(opts);
+  const styleData = await loadStyle(opts);
   const browser = await launchBrowser();
   try {
     if (opts.ignore && opts.ignore.length) {
@@ -320,7 +322,7 @@ export async function look(opts, { log = () => {} } = {}) {
             localeIndex: g.localeIndex,
           };
           const targets = base ? baselineTargets(base, g.route, `${g.viewport.name}/${scheme}/${g.locale}`) : [];
-          return runCell(browser, opts, cell, baselines.get(`${g.route}|${g.viewport.name}|${scheme}`), targets, session, log);
+          return runCell(browser, { ...opts, styleData }, cell, baselines.get(`${g.route}|${g.viewport.name}|${scheme}`), targets, session, log);
         }));
 
         const light = results.find((r) => r.info.scheme === 'light' && r.info.status === 'ok');
@@ -454,6 +456,7 @@ export async function look(opts, { log = () => {} } = {}) {
       notes,
       baseline,
       project: projectInfo(),
+      style: styleData ? { file: path.basename(styleData.file), learnedAt: styleData.learnedAt, url: styleData.url } : null,
     });
     await writeFile(path.join(runDir, 'report.json'), JSON.stringify(report, null, 2) + '\n');
     await writeFile(path.join(runDir, 'state.json'), JSON.stringify(state) + '\n');

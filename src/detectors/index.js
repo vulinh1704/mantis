@@ -15,6 +15,7 @@ import clippedText from './clipped-text.js';
 import consoleErrors from './console.js';
 import contrast from './contrast.js';
 import layoutShift from './layout-shift.js';
+import offStyle from './off-style.js';
 import overlap from './overlap.js';
 import pageOverflow from './page-overflow.js';
 import requestFailed from './request-failed.js';
@@ -31,6 +32,7 @@ export const CELL_DETECTORS = [
   brokenImage,
   consoleErrors,
   requestFailed,
+  offStyle,
 ];
 
 export const CROSS_DETECTORS = [themeLeak];
@@ -48,5 +50,6 @@ export const ISSUE_TYPES = [
   'request-failed',
   'tap-target',
   'layout-shift',
+  'off-style',
   'lost',
 ];

@@ -114,7 +114,7 @@ export function brandStyle(project) {
 
 /**
  * A hand-drawn marker circle around `rect` (thumbnail pixels) with a short note under or above
- * it, inside a box of `w` x `h`. tone: 'err' (found) or 'ok' (fixed).
+ * it, inside a box of `w` x `h`. tone: 'err' (found) or 'ok' (fixed). No note when `note` is empty.
  */
 export function scribbleHtml(rect, w, h, note, tone = 'err') {
   const cx = rect.x + rect.width / 2;
@@ -132,7 +132,7 @@ export function scribbleHtml(rect, w, h, note, tone = 'err') {
   const top = below ? cy + ry * 1.08 + 6 : Math.max(2, cy - ry * 1.08 - 28);
   const left = Math.max(4, Math.min(w - 128, cx - 40));
   return `<svg class="scribble ${tone}" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><path d="M${pts.join(' L')}"/></svg>` +
-    `<div class="note ${tone}" style="left:${f1(left)}px;top:${f1(top)}px">${escapeHtml(note)}</div>`;
+    (note ? `<div class="note ${tone}" style="left:${f1(left)}px;top:${f1(top)}px">${escapeHtml(note)}</div>` : '');
 }
 
 /** Issue types worth circling, most telling first. */

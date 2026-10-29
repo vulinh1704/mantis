@@ -284,3 +284,11 @@ h1, h2, h3 { line-height: 1.2; }
   /* PLANTED(badge-covers-cta): on phones the badge was moved "to the bottom" — right on top of the CTA */
   .badge { top: auto; bottom: 30px; left: 50%; right: auto; transform: translateX(-50%); }
 }
+
+/* PLANTED (style drift, found by `mantis learn` as near-duplicates): values typed by hand that are
+   a hair away from the house tokens. Light scheme only, so they add no contrast or dark-mode bug. */
+@media (prefers-color-scheme: light) {
+  .role { color: #465569; }             /* --muted is #475569 */
+}
+.role { font-size: 13.6px; }            /* the scale has 14px */
+#newsletter-submit { border-radius: 15px; } /* --radius is 16px */
