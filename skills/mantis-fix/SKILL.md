@@ -4,9 +4,10 @@ description: >
   Fix the UI problems Mantis found at their root cause instead of hiding them, then
   look again until the report is clean. Covers page overflow, cut-off text,
   overlapping controls, contrast, dark-mode leaks, tap targets, console errors,
-  broken images and layout shift. Use after /mantis reports errors, or when the
-  user says "fix the mobile layout", "dark mode is broken", "text is cut off",
-  /mantis-fix.
+  broken images and layout shift. Use after /mantis reports errors, when a failing
+  UI or layout check has to pass ("make check:ui pass", "the mobile test is red",
+  "the release is blocked by a layout test"), or when the user says "fix the
+  mobile layout", "dark mode is broken", "text is cut off", /mantis-fix.
 ---
 
 # Mantis fix
@@ -60,6 +61,20 @@ colors, CSS variables, font sizes, radii and spacing the app already uses.
 
 Never pass `--baseline none` to make a cover-up go away. It is for starting over
 after an intended redesign, and you say so in your report.
+
+## When a failing check must pass
+
+A red UI test (`npm run check:ui`, a screenshot or e2e layout test) reports
+symptoms, and the quickest way to turn it green is usually to hide them. The rules
+above still apply, plus:
+
+- Run `mantis look` once before the first edit, so the run after your fix can tell
+  a fix from a cover-up.
+- When the user asked for a small change, keep to what the check reports. List
+  the other Mantis findings in your report instead of fixing them.
+- Never edit the check, its thresholds or its list of pages to make it pass.
+- Done means the check passes **and** the last `mantis look` shows 0 cover-ups and
+  0 lost.
 
 ## Never "fix" by hiding
 
