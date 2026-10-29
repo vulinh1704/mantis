@@ -102,6 +102,23 @@ change them:
 { "name": "Lumen", "logo": "public/logo.svg", "brandColor": "#4f46e5", "repo": "acme/lumen", "qr": true }
 ```
 
+## Pages behind a login
+
+Give Mantis a Playwright storage state and every screen starts signed in:
+
+```bash
+npx playwright codegen --save-storage=.mantis/auth.json http://localhost:3000/login   # sign in, close the window
+mantis look http://localhost:3000 --routes /dashboard,/settings --storage-state .mantis/auth.json
+```
+
+If the app only keeps a flag in localStorage (onboarding done, a demo session), write the file by hand:
+
+```json
+{ "cookies": [], "origins": [{ "origin": "http://localhost:3000", "localStorage": [{ "name": "onboarded", "value": "1" }] }] }
+```
+
+The file holds a live session, so keep it out of git (add `.mantis/` to your `.gitignore`). `proof --video` takes the same flag. A run is only compared with earlier runs that used a storage state file of the same name.
+
 ## Install
 
 > Mantis is in early development (v0.2). Expect rough edges, and please [open an issue](https://github.com/vulinh1704/mantis/issues) when it gets something wrong.

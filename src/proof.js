@@ -6,7 +6,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { renderHtmlToPng } from './contact-sheet.js';
 import { launchBrowser } from './look.js';
-import { UsageError } from './options.js';
+import { UsageError, readStorageState } from './options.js';
 import { applyDarkStrategy, contextOptions, fontsReady, settle } from './page.js';
 import { formatLocalTime } from './report.js';
 import {
@@ -313,9 +313,9 @@ export async function hasFfmpeg() {
 }
 
 /** Record the scripted visit: load, scroll down and back up, then switch to the dark scheme. */
-async function recordVisit(browser, url, viewport, darkStrategy, dir) {
+async function recordVisit(browser, url, viewport, darkStrategy, dir, session) {
   const context = await browser.newContext({
-    ...contextOptions({ viewport, scheme: 'light', locale: 'en' }),
+    ...contextOptions({ viewport, scheme: 'light', locale: 'en' }, session),
     reducedMotion: 'no-preference',
     recordVideo: { dir, size: { width: viewport.width, height: viewport.height } },
   });
@@ -404,8 +404,9 @@ export async function proofVideo(browser, opts, log, cards = null) {
   const tmp = await mkdtemp(path.join(os.tmpdir(), 'mantis-video-'));
   try {
     const strategy = opts.darkStrategy ?? { kind: 'media' };
-    const beforeWebm = await recordVisit(browser, opts.beforeUrl, opts.viewport, strategy, path.join(tmp, 'before'));
-    const afterWebm = await recordVisit(browser, opts.afterUrl, opts.viewport, strategy, path.join(tmp, 'after'));
+    const session = opts.storageState ? await readStorageState(opts.storageState) : null;
+    const beforeWebm = await recordVisit(browser, opts.beforeUrl, opts.viewport, strategy, path.join(tmp, 'before'), session);
+    const afterWebm = await recordVisit(browser, opts.afterUrl, opts.viewport, strategy, path.join(tmp, 'after'), session);
     const out = path.resolve(opts.videoOut);
     await mkdir(path.dirname(out), { recursive: true });
     if (!(await hasFfmpeg())) {

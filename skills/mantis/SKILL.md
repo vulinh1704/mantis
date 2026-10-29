@@ -24,8 +24,14 @@ looks right" is not evidence. A Mantis run with zero errors is.
   note the URL. If it is already running, reuse it.
 - List the routes your change touches. Add `/` when the change is global
   (layout, theme, fonts, CSS reset).
-- Pages behind a login: use a dev or seed user, or a public preview route. If you
-  can't reach a page, say so in your report instead of skipping it silently.
+- Pages behind a login or onboarding: pass `--storage-state <file>`, a Playwright
+  storage state with the session's cookies and localStorage. Ask the user for one,
+  or make it: `npx playwright codegen --save-storage=.mantis/auth.json <login-url>`
+  (the user signs in and closes the window), or a short Playwright script that signs
+  in with a dev or seed user and calls `context.storageState({ path })`. When the
+  app only checks a localStorage flag (onboarding done), write the JSON by hand.
+  The file holds a live session: keep it in `.mantis/` or elsewhere out of git.
+- If you can't reach a page, say so in your report instead of skipping it silently.
 
 ## 2. Look
 
@@ -33,7 +39,7 @@ looks right" is not evidence. A Mantis run with zero errors is.
 mantis look http://localhost:3000 --routes /,/settings
 ```
 
-If `mantis` isn't installed, run `npx -y @vulinh1704/mantis look …` instead.
+If `mantis` isn't installed, run `npx -y github:vulinh1704/mantis look …` instead.
 
 - `--locales en,vi` when the app has translations. Longer languages (Vietnamese,
   German) break layouts that look fine in English.

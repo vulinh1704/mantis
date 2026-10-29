@@ -9,8 +9,9 @@ export function acceptLanguage(locale) {
 /**
  * Playwright context options for one cell.
  * @param {{viewport: import('./options.js').Viewport, scheme: 'light'|'dark', locale: string}} cell
+ * @param {{cookies: object[], origins: object[]} | null} [storageState]  session to start with (--storage-state)
  */
-export function contextOptions(cell) {
+export function contextOptions(cell, storageState = null) {
   const v = cell.viewport;
   return {
     viewport: { width: v.width, height: v.height },
@@ -24,6 +25,7 @@ export function contextOptions(cell) {
     bypassCSP: true,
     ignoreHTTPSErrors: true,
     serviceWorkers: 'block',
+    ...(storageState ? { storageState } : {}),
   };
 }
 

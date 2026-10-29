@@ -10,7 +10,8 @@ Usage
   mantis look <url> [options]
   mantis proof --before <runDir> --after <runDir> [--out <file.png>]
                [--video --before-url <url> --after-url <url> [--viewport mobile]
-                [--dark-strategy media|class:dark|attr:data-theme=dark]]
+                [--dark-strategy media|class:dark|attr:data-theme=dark]
+                [--storage-state <file>]]
 
 look: open <url> in Chromium for every route x viewport x scheme x locale, detect
 problems (overflow, clipped text, overlaps, contrast, dark-mode leaks, small tap
@@ -41,6 +42,11 @@ in <out>/latest.
                                because its element was hidden, removed, shrunk or
                                cut off is a cover-up error; a control or heading
                                that disappeared is a lost warning
+  --storage-state <file>       start every cell with the cookies and localStorage of
+                               a Playwright storage state file, to look at pages
+                               behind a login or onboarding. Make one with
+                               npx playwright codegen --save-storage=<file> <url>
+                               or write the JSON by hand; keep it out of git
 
 proof: side-by-side before/after sheet of two runs (run dirs, or the aliases
 latest / prev / first under .mantis), written to --out (default .mantis/proof.png),

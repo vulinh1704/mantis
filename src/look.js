@@ -8,7 +8,7 @@ import { renderContactSheet } from './contact-sheet.js';
 import { CELL_DETECTORS, CROSS_DETECTORS } from './detectors/index.js';
 import { installMantisLib } from './inpage/lib.js';
 import { collectState } from './inpage/state.js';
-import { UsageError, formatDarkStrategy, routeSlug } from './options.js';
+import { UsageError, formatDarkStrategy, readStorageState, routeSlug } from './options.js';
 import {
   applyDarkStrategy,
   contextOptions,
@@ -69,8 +69,8 @@ export async function launchBrowser() {
   }
 }
 
-async function preflight(browser, url) {
-  const context = await browser.newContext({ ignoreHTTPSErrors: true });
+async function preflight(browser, url, session) {
+  const context = await browser.newContext({ ignoreHTTPSErrors: true, ...(session ? { storageState: session } : {}) });
   try {
     await context.request.get(url, { timeout: 20000, failOnStatusCode: false, maxRedirects: 10 });
   } catch (err) {
@@ -110,7 +110,7 @@ const probeTargets = (raws) => raws.flatMap((r) => issueSelectors(r.selector, r.
  * then capture the cell's state (probes of `targets` and of its own issues, plus the inventory).
  * The page is left open: the caller annotates it, takes the screenshot and closes the context.
  */
-async function runCell(browser, opts, cell, baseline, targets, log) {
+async function runCell(browser, opts, cell, baseline, targets, session, log) {
   const info = {
     id: cell.id,
     key: `${cell.viewport.name}/${cell.scheme}/${cell.locale}`,
@@ -129,7 +129,7 @@ async function runCell(browser, opts, cell, baseline, targets, log) {
     notes: [],
   };
   const out = { info, page: null, context: null, raw: [], snapshots: {}, state: null };
-  const context = await browser.newContext(contextOptions(cell));
+  const context = await browser.newContext(contextOptions(cell, session));
   context.setDefaultTimeout(opts.timeout);
   const page = await context.newPage();
   out.context = context;
@@ -237,6 +237,7 @@ async function runCell(browser, opts, cell, baseline, targets, log) {
  */
 export async function look(opts, { log = () => {} } = {}) {
   const startedAt = new Date();
+  const session = opts.storageState ? await readStorageState(opts.storageState) : null;
   const base = await findBaseline(opts);
   const browser = await launchBrowser();
   try {
@@ -253,7 +254,7 @@ export async function look(opts, { log = () => {} } = {}) {
       await probe.close();
       if (invalid.length) throw new UsageError(`invalid --ignore selector: ${invalid.join(' | ')}`);
     }
-    await preflight(browser, new URL(opts.routes[0], opts.baseUrl).href);
+    await preflight(browser, new URL(opts.routes[0], opts.baseUrl).href, session);
 
     const outDir = path.resolve(opts.out);
     const runDir = await uniqueDir(path.join(outDir, 'runs'), runIdFor(startedAt));
@@ -305,7 +306,7 @@ export async function look(opts, { log = () => {} } = {}) {
             localeIndex: g.localeIndex,
           };
           const targets = base ? baselineTargets(base, g.route, `${g.viewport.name}/${scheme}/${g.locale}`) : [];
-          return runCell(browser, opts, cell, baselines.get(`${g.route}|${g.viewport.name}|${scheme}`), targets, log);
+          return runCell(browser, opts, cell, baselines.get(`${g.route}|${g.viewport.name}|${scheme}`), targets, session, log);
         }));
 
         const light = results.find((r) => r.info.scheme === 'light' && r.info.status === 'ok');
