@@ -14,7 +14,7 @@
 import { existsSync } from 'node:fs';
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { UsageError } from './options.js';
+import { UsageError, storageStateName } from './options.js';
 import { IssueRegistry } from './report.js';
 
 /** Issue types produced by the comparison itself; they are never compared again. */
@@ -38,9 +38,9 @@ async function readRun(dir) {
 
 /**
  * The run to compare with: null for `none`; the given run directory; or, for `auto` (default),
- * the most recent run of the same URL in `<out>/runs`. Runs without state.json (Mantis 0.1)
- * cannot be compared.
- * @param {{baseline?: string, out: string, url: string}} opts
+ * the most recent run of the same URL and storage state file in `<out>/runs`. Runs without
+ * state.json (Mantis 0.1) cannot be compared.
+ * @param {{baseline?: string, out: string, url: string, storageState?: string|null}} opts
  */
 export async function findBaseline(opts) {
   const choice = opts.baseline ?? 'auto';
@@ -54,12 +54,13 @@ export async function findBaseline(opts) {
   const runsDir = path.resolve(opts.out, 'runs');
   if (!existsSync(runsDir)) return null;
   const names = (await readdir(runsDir)).sort().reverse();
+  const session = storageStateName(opts.storageState);
   for (const name of names) {
     const dir = path.join(runsDir, name);
     if (!existsSync(path.join(dir, 'state.json'))) continue;
     try {
       const run = await readRun(dir);
-      if (run.report.url === opts.url) return run;
+      if (run.report.url === opts.url && (run.report.matrix?.storageState ?? null) === session) return run;
     } catch {
       // unreadable run: try an older one
     }

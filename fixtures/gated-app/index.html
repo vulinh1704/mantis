@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ledger — sign in</title>
+  <link rel="icon" href="data:,">
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 16px/1.5 system-ui, sans-serif; color: #1d1d1f; background: #fff; }
+    main { padding: 24px 16px; }
+    h1 { margin: 0 0 16px; font-size: 28px; }
+    label { display: block; margin-bottom: 12px; }
+    input, button { display: block; width: 100%; min-height: 44px; margin-top: 4px; font: inherit; }
+    input { padding: 8px 12px; border: 1px solid #6e6e73; border-radius: 8px; }
+    button { border: 0; border-radius: 8px; color: #fff; background: #0a5bd3; }
+    /* Planted bug, only behind the sign-in: the invoice table is wider than a phone. */
+    .invoices { width: 560px; border-collapse: collapse; }
+    .invoices td, .invoices th { padding: 8px; border-bottom: 1px solid #d2d2d7; text-align: left; }
+  </style>
+</head>
+<body>
+  <main id="signin">
+    <h1>Sign in to Ledger</h1>
+    <form>
+      <label>Email <input type="email" name="email" autocomplete="email"></label>
+      <button type="submit">Sign in</button>
+    </form>
+  </main>
+  <main id="dashboard" hidden>
+    <h1>Invoices</h1>
+    <table class="invoices">
+      <thead><tr><th>Number</th><th>Customer</th><th>Due</th><th>Amount</th></tr></thead>
+      <tbody>
+        <tr><td>INV-1042</td><td>Northwind Traders</td><td>2026-11-04</td><td>$1,240.00</td></tr>
+        <tr><td>INV-1043</td><td>Contoso Pharmaceuticals</td><td>2026-11-12</td><td>$860.50</td></tr>
+      </tbody>
+    </table>
+  </main>
+  <script>
+    // The session lives in localStorage, the way many single-page apps keep it.
+    if (localStorage.getItem('ledger-session') === 'signed-in') {
+      document.getElementById('signin').hidden = true;
+      document.getElementById('dashboard').hidden = false;
+      document.title = 'Ledger — invoices';
+    }
+  </script>
+</body>
+</html>

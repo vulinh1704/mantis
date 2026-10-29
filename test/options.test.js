@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 import { describe, test } from 'node:test';
 import {
   LOOK_DEFAULTS,
@@ -8,8 +11,10 @@ import {
   parseLookArgs,
   parseProofArgs,
   parseViewport,
+  readStorageState,
   routeSlug,
   splitList,
+  storageStateName,
 } from '../src/options.js';
 
 describe('parseLookArgs', () => {
@@ -135,5 +140,41 @@ describe('parseProofArgs', () => {
     assert.throws(() => parseProofArgs(['--before', 'a']), /together/);
     assert.throws(() => parseProofArgs(['--video', '--before-url', 'http://a']), /--after-url/);
     assert.throws(() => parseProofArgs(['--before', 'a', '--after', 'b', '--out', 'p.jpg']), /\.png/);
+  });
+});
+
+describe('--storage-state', () => {
+  test('look and proof resolve the path; it is off by default', () => {
+    assert.equal(parseLookArgs(['http://localhost:3000']).storageState, null);
+    assert.equal(parseLookArgs(['http://localhost:3000', '--storage-state', 'auth.json']).storageState, path.resolve('auth.json'));
+    const p = parseProofArgs(['--video', '--before-url', 'http://a.test', '--after-url', 'http://b.test', '--storage-state', 'x/auth.json']);
+    assert.equal(p.storageState, path.resolve('x/auth.json'));
+    assert.throws(() => parseLookArgs(['http://localhost:3000', '--storage-state', ' ']), /--storage-state is empty/);
+  });
+
+  test('readStorageState accepts cookies, origins or both and rejects anything else', async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'mantis-state-'));
+    const write = async (name, data) => {
+      const file = path.join(dir, name);
+      await writeFile(file, typeof data === 'string' ? data : JSON.stringify(data));
+      return file;
+    };
+    try {
+      assert.deepEqual(await readStorageState(await write('o.json', { origins: [{ origin: 'http://a.test', localStorage: [] }] })),
+        { cookies: [], origins: [{ origin: 'http://a.test', localStorage: [] }] });
+      assert.deepEqual(await readStorageState(await write('c.json', { cookies: [{ name: 'sid' }] })), { cookies: [{ name: 'sid' }], origins: [] });
+      await assert.rejects(readStorageState(path.join(dir, 'missing.json')), /no such file/);
+      await assert.rejects(readStorageState(await write('bad.json', '{nope')), UsageError);
+      await assert.rejects(readStorageState(await write('arr.json', [])), /not a Playwright storage state/);
+      await assert.rejects(readStorageState(await write('tok.json', { token: 'x' })), /not a Playwright storage state/);
+      await assert.rejects(readStorageState(await write('mixed.json', { cookies: {}, origins: [] })), /not a Playwright storage state/);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('storageStateName shows only the file name', () => {
+    assert.equal(storageStateName(null), null);
+    assert.equal(storageStateName(path.join('a', 'b', 'auth.json')), 'auth.json');
   });
 });

@@ -1,4 +1,7 @@
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
 import { parseArgs } from 'node:util';
+import { firstLine } from './util.js';
 
 /** Raised for bad CLI input. The CLI prints the message and exits with code 2. */
 export class UsageError extends Error {
@@ -160,6 +163,7 @@ const LOCALE_RE = /^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$/;
  * @property {number} timeout
  * @property {string[]} ignore  CSS selectors excluded from every detector (plus [data-mantis-ignore]).
  * @property {string} baseline  run to compare with: 'auto' (previous run of the same URL), 'none' or a run directory.
+ * @property {string|null} storageState  Playwright storage state file every cell starts with (cookies + localStorage).
  */
 
 /**
@@ -187,6 +191,7 @@ export function parseLookArgs(argv) {
         timeout: { type: 'string' },
         ignore: { type: 'string', multiple: true },
         baseline: { type: 'string' },
+        'storage-state': { type: 'string' },
       },
     });
   } catch (err) {
@@ -249,6 +254,7 @@ export function parseLookArgs(argv) {
     timeout: parseIntOpt('timeout', values.timeout, 1000, 600000) ?? LOOK_DEFAULTS.timeout,
     ignore: (values.ignore ?? []).map((s) => s.trim()).filter(Boolean),
     baseline: parseBaseline(values.baseline),
+    storageState: parseStorageStatePath(values['storage-state']),
   };
 }
 
@@ -257,6 +263,37 @@ function parseBaseline(value) {
   const v = value.trim();
   if (!v) throw new UsageError('--baseline is empty (use auto, none or a run directory)');
   return v;
+}
+
+function parseStorageStatePath(value) {
+  if (value === undefined) return null;
+  const v = value.trim();
+  if (!v) throw new UsageError('--storage-state is empty (give the path of a Playwright storage state JSON file)');
+  return path.resolve(v);
+}
+
+/** Name of a storage state file as reports show it, or null when the run had none. */
+export const storageStateName = (file) => (file ? path.basename(file) : null);
+
+/**
+ * Read a Playwright storage state file: `{"cookies": [...], "origins": [{origin, localStorage}]}`, as
+ * written by `npx playwright codegen --save-storage=<file> <url>` or `context.storageState({ path })`.
+ * @param {string} file
+ * @returns {Promise<{cookies: object[], origins: object[]}>}
+ */
+export async function readStorageState(file) {
+  let data;
+  try {
+    data = JSON.parse(await readFile(file, 'utf8'));
+  } catch (err) {
+    throw new UsageError(`--storage-state: cannot read ${file}: ${err.code === 'ENOENT' ? 'no such file' : firstLine(err.message)}`);
+  }
+  const ok = data && typeof data === 'object' && !Array.isArray(data) &&
+    (Array.isArray(data.cookies) || Array.isArray(data.origins)) &&
+    (data.cookies === undefined || Array.isArray(data.cookies)) &&
+    (data.origins === undefined || Array.isArray(data.origins));
+  if (!ok) throw new UsageError(`--storage-state: ${file} is not a Playwright storage state (expected {"cookies": [...], "origins": [...]})`);
+  return { cookies: data.cookies ?? [], origins: data.origins ?? [] };
 }
 
 /**
@@ -270,6 +307,7 @@ function parseBaseline(value) {
  * @property {Viewport} viewport
  * @property {DarkStrategy} darkStrategy
  * @property {string} videoOut
+ * @property {string|null} storageState  Playwright storage state file both recordings start with.
  */
 
 /**
@@ -293,6 +331,7 @@ export function parseProofArgs(argv) {
         'after-url': { type: 'string' },
         viewport: { type: 'string' },
         'dark-strategy': { type: 'string' },
+        'storage-state': { type: 'string' },
       },
     });
   } catch (err) {
@@ -327,5 +366,6 @@ export function parseProofArgs(argv) {
     viewport: parseViewport(v.viewport ?? 'mobile'),
     darkStrategy: parseDarkStrategy(v['dark-strategy'] ?? 'media'),
     videoOut: out.replace(/\.png$/i, '.mp4'),
+    storageState: parseStorageStatePath(v['storage-state']),
   };
 }
