@@ -1,7 +1,7 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "mantis",
-  "description": "Mantis gives coding agents eyes for UI work.",
+  "description": "Catches the UI bugs your coding agent can't see, and the ones it hides.",
   "owner": {
     "name": "Truong Dang Vu Linh",
     "url": "https://github.com/vulinh1704"

@@ -1,7 +1,7 @@
 {
   "name": "@vulinh1704/mantis",
   "version": "0.3.0",
-  "description": "Give your coding agent eyes for UI work: sweep viewports x color schemes x locales in a real browser, detect layout, contrast, dark-mode and i18n bugs with evidence, and get annotated screenshots plus a compact report.",
+  "description": "Catches the UI bugs your coding agent can't see, and the ones it hides: every viewport x color scheme x locale in a real browser, cover-up detection, your house style, before/after proof. Agent skills + CLI.",
   "type": "module",
   "bin": {
     "mantis": "bin/mantis.js"

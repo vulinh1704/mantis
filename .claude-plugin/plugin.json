@@ -1,7 +1,7 @@
 {
   "name": "mantis",
   "version": "0.3.0",
-  "description": "Gives your coding agent eyes for UI work: checks every screen, theme and language in a real browser, fixes what is broken at the root, and proves it with before/after screenshots.",
+  "description": "Catches the UI bugs your coding agent can't see, and the ones it hides: checks every screen, theme and language in a real browser, flags fixes that only hide a bug, keeps your house style, and proves the fix with before/after images.",
   "author": {
     "name": "Truong Dang Vu Linh",
     "url": "https://github.com/vulinh1704"

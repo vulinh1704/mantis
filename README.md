@@ -26,11 +26,11 @@ Then someone opens the page on a phone:
 - in dark mode one card is still white, with white text on it;
 - the Vietnamese button label is cut in half.
 
-**Mantis gives the agent eyes.** It:
+**Mantis catches the UI bugs your agent can't see, and the ones it hides.** It:
 1. opens the real app;
 2. checks every screen size, both themes and every language you ship;
 3. boxes what is broken in red;
-4. fixes it at the root;
+4. fixes it at the root, and flags any "fix" that only hides the bug;
 5. proves it with before/after screenshots.
 
 <p align="center">
