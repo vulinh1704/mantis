@@ -427,3 +427,55 @@ describe('precision fixes from the OSS scan', () => {
     assert.deepEqual(issues.map((i) => [i.selector, i.evidence.with]), [['#badge', '#label']], 'a button on a text link is still reported');
   });
 });
+
+describe('canvas apps: backgrounds read from pixels', () => {
+  // A whiteboard-like page: the "page" is a full-screen <canvas>, the UI sits on top with
+  // pointer-events:none, and a transparent layer covers everything (axe: "bgOverlap").
+  const paint = '<script>const c=document.getElementById("cv");c.width=innerWidth;c.height=innerHeight;const x=c.getContext("2d");x.fillStyle=matchMedia("(prefers-color-scheme: dark)").matches?"#121212":"#ffffff";x.fillRect(0,0,c.width,c.height);</script>';
+  const css = 'body{background:transparent} #cv{position:fixed;inset:0;width:100%;height:100%} .ui{position:fixed;inset:0;z-index:1;pointer-events:none;padding:40px} .ui p{font-size:18px;margin:0 0 16px}';
+  const ui = (cover) => `
+    <canvas id="cv"></canvas>
+    <div class="ui">
+      <p id="faint" style="color:#b8b8b8">Your drawings are saved in your browser</p>
+      <p id="fine" style="color:#333">A readable label</p>
+      <button id="share" style="pointer-events:auto;background:#e3e2fe;color:#fff;border:0;padding:10px 16px;font-size:14px">Share</button>
+    </div>
+    <div id="cover" style="position:fixed;inset:0;z-index:2;${cover}"></div>${paint}`;
+
+  test('contrast: text on a canvas, under a transparent layer, is measured from the screenshot', async () => {
+    const issues = await detect(contrast, ui(''), { css });
+    assert.deepEqual(sels(issues), ['#faint', '#share']);
+    assert.equal(issues.find((i) => i.selector === '#faint').evidence.background, 'pixels');
+    const faint = issues.find((i) => i.selector === '#faint');
+    assert.ok(faint.evidence.contrastRatio > 1.8 && faint.evidence.contrastRatio < 2.1, `ratio ${faint.evidence.contrastRatio}`);
+    assert.equal(faint.evidence.bgColor, '#ffffff');
+  });
+
+  test('contrast: text hidden under an opaque layer is not measured from pixels', async () => {
+    // (#share keeps its own opaque background, so axe itself still reports it.)
+    const issues = await detect(contrast, ui('background:#ffffff'), { css });
+    assert.deepEqual(issues.filter((i) => i.evidence.background === 'pixels'), []);
+  });
+
+  test('theme-leak: on a canvas app the page background comes from the pixels', async () => {
+    const island = `
+      <canvas id="cv"></canvas>
+      <h1 class="sr" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);color:#000">Whiteboard</h1>
+      <div id="island" style="position:fixed;left:20px;bottom:20px;z-index:1;background:#ececf4;padding:8px 12px;width:160px;height:40px"><span class="zoom">100%</span></div>${paint}`;
+    const islandCss = `${css} .zoom{color:#1b1b1f} @media (prefers-color-scheme: dark){.zoom{color:#e3e3e8}}`;
+    const snaps = {};
+    const pages = {};
+    const contexts = [];
+    for (const scheme of ['light', 'dark']) {
+      const { context, page } = await open(htmlDoc(island, islandCss), { scheme });
+      contexts.push(context);
+      snaps[scheme] = await themeLeak.collect(page);
+      pages[scheme] = page;
+    }
+    const cmp = themeLeak.compare(snaps.light, snaps.dark);
+    const issues = await themeLeak.resolve(pages.dark, cmp.findings);
+    for (const c of contexts) await c.close();
+    assert.equal(cmp.flipped, true, `light ${cmp.lightBg}, dark ${cmp.darkBg}`);
+    assert.deepEqual(issues.map((i) => [i.selector, i.evidence.kind, i.severity]), [['#island', 'container', 'error']]);
+  });
+});
