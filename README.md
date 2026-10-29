@@ -144,6 +144,18 @@ npx -y github:vulinh1704/mantis look http://localhost:3000
 
 Mantis drives Chromium through Playwright. If the browser isn't installed yet, run `npx playwright install chromium`. Node.js 20 or newer.
 
+**Docker.** No Node or browser to install. The image comes with Chromium, ffmpeg and the fonts the sheets use, for `linux/amd64` and `linux/arm64`:
+
+```bash
+# Docker Desktop (Mac, Windows): reach the dev server through host.docker.internal
+docker run --rm -v "$PWD:/work" ghcr.io/vulinh1704/mantis look http://host.docker.internal:3000
+
+# Linux: share the host's network, and own the files it writes
+docker run --rm --network host --user "$(id -u):$(id -g)" -v "$PWD:/work" ghcr.io/vulinh1704/mantis look http://localhost:3000
+```
+
+The report lands in `./.mantis` as usual. A storage state file in the mounted directory works as `--storage-state .mantis/auth.json`.
+
 ## Numbers
 
 What has been measured so far:

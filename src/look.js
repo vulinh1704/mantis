@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { cp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import path from 'node:path';
@@ -74,10 +75,23 @@ async function preflight(browser, url, session) {
   try {
     await context.request.get(url, { timeout: 20000, failOnStatusCode: false, maxRedirects: 10 });
   } catch (err) {
-    throw new UnreachableError(`cannot reach ${url}: ${firstLine(err.message)}`);
+    throw new UnreachableError(`cannot reach ${url}: ${firstLine(err.message)}${containerHint(url)}`);
   } finally {
     await context.close().catch(() => {});
   }
+}
+
+/**
+ * Inside a container, localhost is the container itself. Say how to reach a dev server on the host.
+ * @param {string} url
+ * @param {boolean} [inContainer]
+ */
+export function containerHint(url, inContainer = existsSync('/.dockerenv')) {
+  const u = new URL(url);
+  if (!inContainer || !/^(localhost|127\.0\.0\.1|\[::1\]|0\.0\.0\.0)$/.test(u.hostname)) return '';
+  const viaHost = new URL(url);
+  viaHost.hostname = 'host.docker.internal';
+  return `\nInside Docker, ${u.hostname} is the container itself. With Docker Desktop (Mac, Windows) use ${viaHost.href}; on Linux, run the container with --network host.`;
 }
 
 async function fullPageShot(page, file) {

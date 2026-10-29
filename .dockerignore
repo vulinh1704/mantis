@@ -1,0 +1,7 @@
+*
+!package.json
+!package-lock.json
+!bin/
+!src/
+!skills/
+!assets/mantis-128.png
