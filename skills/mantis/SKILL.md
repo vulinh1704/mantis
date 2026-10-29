@@ -68,6 +68,11 @@ README for how it reaches a dev server on the host).
    are boxed in red and warnings in amber, each with its issue number. Look at the
    image before deciding; a selector alone can mislead.
 3. `.mantis/latest/contact-sheet.png` shows every screen at once.
+4. A clean report means clean for what Mantis measures, not "nothing is wrong".
+   Scan the sheet and the shots for what it can't judge: text over photos or
+   gradients, a control that is missing, spacing that looks off. Say what you saw.
+5. One bug can hide another: an invisible toolbar can't overlap anything. After a
+   fix, look again before you call the report final.
 
 ## 4. Decide
 
@@ -90,3 +95,6 @@ check.
 - It doesn't click through flows or test hover and focus states yet. Visit a route
   that shows the menu or dialog you changed, or say it was not checked.
 - It doesn't measure animation smoothness.
+- Contrast on canvas apps and under transparent layers is read from the
+  screenshot. Text over photos, CSS background images and gradients is not
+  checked: look at those yourself.
