@@ -16,6 +16,11 @@
   <img src="https://img.shields.io/badge/browser-Playwright-111111?style=flat-square" alt="Playwright">
 </p>
 
+<p align="center">
+  <a href="https://github.com/vulinh1704/mantis/releases/download/v0.3.0/mantis-intro.mp4"><img src="assets/intro-thumb.jpg" width="880" alt="Mantis in 60 seconds: an agent says it fixed the layout but hid the menu button, and Mantis catches the cover-up"></a>
+  <br><sub>▶ <a href="https://github.com/vulinh1704/mantis/releases/download/v0.3.0/mantis-intro.mp4">Watch the 60-second intro</a> (MP4, 4 MB) · <a href="https://github.com/vulinh1704/mantis/releases/download/v0.3.0/mantis-intro-1080p.mp4">1080p</a></sub>
+</p>
+
 ---
 
 Your coding agent builds UI with its eyes closed. It writes the CSS, says
