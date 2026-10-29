@@ -40,6 +40,8 @@ mantis look http://localhost:3000 --routes /,/settings
 ```
 
 If `mantis` isn't installed, run `npx -y github:vulinh1704/mantis look …` instead.
+Without Node or a browser, use the Docker image (`ghcr.io/vulinh1704/mantis`, see the
+README for how it reaches a dev server on the host).
 
 - `--locales en,vi` when the app has translations. Longer languages (Vietnamese,
   German) break layouts that look fine in English.

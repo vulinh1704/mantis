@@ -1,0 +1,111 @@
+name: Docker
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+    paths:
+      - Dockerfile
+      - .dockerignore
+      - package.json
+      - package-lock.json
+      - bin/**
+      - src/**
+      - .github/workflows/docker.yml
+  pull_request:
+    paths:
+      - Dockerfile
+      - .dockerignore
+      - package.json
+      - package-lock.json
+      - bin/**
+      - src/**
+      - .github/workflows/docker.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: build and smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Build
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          load: true
+          tags: mantis:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Look at the buggy-app fixture from the container
+        run: |
+          node test/helpers/static-server.js fixtures/buggy-app 4321 &
+          for i in $(seq 1 40); do curl -sf -o /dev/null http://127.0.0.1:4321/ && break; sleep 0.5; done
+          mkdir -p out
+          set +e
+          docker run --rm --network host --user "$(id -u):$(id -g)" -v "$PWD/out:/work" mantis:ci \
+            look http://127.0.0.1:4321/ --viewports mobile,desktop --schemes light,dark
+          code=$?
+          set -e
+          echo "exit code $code"
+          test "$code" = 1
+          test -s out/.mantis/latest/contact-sheet.png
+          jq -e '.summary.errors > 0' out/.mantis/latest/report.json
+
+      - name: Upload the container's output
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: docker-smoke-output
+          path: out/.mantis/latest
+          if-no-files-found: ignore
+          retention-days: 7
+
+  publish:
+    name: publish to ghcr.io
+    needs: smoke
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-qemu-action@v4
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ghcr.io/${{ github.repository }}
+          # main -> latest; a v1.2.3 tag -> 1.2.3 and 1.2
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      - name: Build and push (amd64, arm64)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
