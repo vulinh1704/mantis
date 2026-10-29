@@ -396,3 +396,34 @@ describe('theme-leak', () => {
     assert.deepEqual(cls.issues.map((i) => i.selector).sort(), ['#leak', '#title']);
   });
 });
+
+describe('precision fixes from the OSS scan', () => {
+  test('console: service-worker registration errors are not reported (Mantis blocks service workers)', async () => {
+    const { context, page, ctx } = await open(htmlDoc(`<p>hi</p><script>
+      console.error('registerSW failed', new TypeError("Cannot read properties of undefined (reading 'waiting')"));
+      console.error('real failure');
+    </script>`));
+    ctx.cellInfo = { notes: [] };
+    try {
+      const issues = await consoleErrors.run(page, ctx);
+      assert.equal(issues.length, 1);
+      assert.match(issues[0].message, /^console\.error: real failure/);
+      assert.match(ctx.cellInfo.notes[0], /1 console error about service workers not reported/);
+    } finally {
+      await context.close();
+    }
+  });
+
+  test('overlap: a small pill drawn on a media thumbnail is a deliberate overlay', async () => {
+    const issues = await detect(overlap, `
+      <div style="position:relative;width:320px;height:180px">
+        <a id="thumb" href="#" style="display:block;width:320px;height:180px"><img src="data:image/svg+xml,${encodeURIComponent(SVG_400)}" alt="A photo" style="width:320px;height:180px;display:block"></a>
+        <button id="alt" style="position:absolute;left:8px;bottom:8px;height:24px;padding:0 8px">ALT</button>
+      </div>
+      <div style="position:relative;width:320px;margin-top:20px">
+        <a id="label" href="#" style="display:block;padding:12px;background:#eef">Upgrade to Pro</a>
+        <button id="badge" style="position:absolute;left:20px;top:8px;height:28px">Popular</button>
+      </div>`);
+    assert.deepEqual(issues.map((i) => [i.selector, i.evidence.with]), [['#badge', '#label']], 'a button on a text link is still reported');
+  });
+});

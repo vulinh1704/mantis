@@ -6,7 +6,9 @@
  *     shows that both actually paint inside the intersection (background, border, text, icon).
  *     Overlapping transparent padding (the negative-margin trick for big icon hit areas) is not
  *     reported. Also skipped: nested elements, fully transparent or off-screen ones, a control
- *     drawn inside a form field (search/clear adornments), identical siblings (card decks, avatar
+ *     drawn inside a form field (search/clear adornments), a small control drawn on a media tile
+ *     (an ALT, play or zoom pill over a link or button that shows only an image or video),
+ *     identical siblings (card decks, avatar
  *     stacks) and pairs where only one side lives in a position:fixed layer (overlays such as
  *     cookie bars and chat bubbles are meant to float over content).
  * (b) Text covered by another element: points sampled along each text line are hit-tested
@@ -49,6 +51,8 @@ export default {
       }
       const isField = (el) => /^(input|textarea|select)$/.test(el.localName);
       const contains = (a, b) => a.x <= b.x + 1 && a.y <= b.y + 1 && a.x + a.width >= b.x + b.width - 1 && a.y + a.height >= b.y + b.height - 1;
+      const isMediaTile = (el) => !!el.querySelector('img, video, picture, canvas') && !(el.innerText || '').trim();
+      const onMedia = (tile, pill) => isMediaTile(tile.el) && contains(tile.r, pill.r) && pill.r.width * pill.r.height < 0.25 * tile.r.width * tile.r.height;
       const pairs = [];
       for (let i = 0; i < targets.length; i++) {
         for (let j = i + 1; j < targets.length; j++) {
@@ -64,6 +68,7 @@ export default {
           const y2 = Math.min(A.r.y + A.r.height, B.r.y + B.r.height);
           if (x2 - x1 < 4 || y2 - y1 < 4) continue;
           if ((isField(A.el) && contains(A.r, B.r)) || (isField(B.el) && contains(B.r, A.r))) continue;
+          if (onMedia(A, B) || onMedia(B, A)) continue;
           pairs.push({ A, B, x1, y1, x2, y2 });
         }
       }

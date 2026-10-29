@@ -14,6 +14,7 @@ import {
   readStorageState,
   routeSlug,
   splitList,
+  undoMsysPath,
   storageStateName,
 } from '../src/options.js';
 
@@ -176,5 +177,23 @@ describe('--storage-state', () => {
   test('storageStateName shows only the file name', () => {
     assert.equal(storageStateName(null), null);
     assert.equal(storageStateName(path.join('a', 'b', 'auth.json')), 'auth.json');
+  });
+});
+
+describe('Git Bash route paths', () => {
+  const gitBash = { EXEPATH: 'C:\Program Files\Git\bin' };
+
+  test('undoMsysPath turns the Windows path Git Bash made back into the route', () => {
+    assert.equal(undoMsysPath('C:/Program Files/Git/', gitBash), '/');
+    assert.equal(undoMsysPath('C:/Program Files/Git/settings.html', gitBash), '/settings.html');
+    assert.equal(undoMsysPath('C:/Program Files/Git/app/Git/intro', gitBash), '/app/Git/intro');
+    assert.equal(undoMsysPath('D:/Tools/PortableGit/settings', {}), '/settings', 'without EXEPATH the Git folder is guessed');
+    assert.equal(undoMsysPath('/settings', gitBash), '/settings');
+    assert.throws(() => undoMsysPath('D:/work/site/index.html', {}), /Git Bash rewrites arguments/);
+  });
+
+  test('parseLookArgs accepts what Git Bash passes for --routes /,/settings.html', () => {
+    const o = parseLookArgs(['http://localhost:4351', '--routes', 'C:/Program Files/Git/,/settings.html']);
+    assert.deepEqual(o.routes, ['/', '/settings.html']);
   });
 });
