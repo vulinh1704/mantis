@@ -1,4 +1,5 @@
 import { chroma, contrastRatio, isLargeText, luminance, over, sameColor, toHex } from '../color.js';
+import { paintedBackground } from '../pixels.js';
 
 /**
  * theme-leak (cross-cell): parts of the page that ignore the dark color scheme.
@@ -18,11 +19,15 @@ import { chroma, contrastRatio, isLargeText, luminance, over, sameColor, toHex }
  * - text (error): text whose color is identical in both schemes while the background behind it
  *   flipped from light to dark, and whose contrast passed in light but fails in dark. Sibling
  *   findings are grouped under their parent.
+ *
+ * On canvas-based apps (a <canvas> or <video> covering half the viewport) the page background is
+ * read from a screenshot, since that is what flips between the schemes, not the html background.
  */
 
-function collectSnapshot() {
+function collectSnapshot(painted) {
   const M = window.__mantis;
   M.reset();
+  M.setPaintedBackground(painted);
   const els = [];
   const skip = new Set(['script', 'style', 'noscript', 'template', 'link', 'meta', 'br', 'wbr', 'source', 'track', 'option', 'optgroup']);
   const all = document.body ? document.body.getElementsByTagName('*') : [];
@@ -32,7 +37,7 @@ function collectSnapshot() {
     if (el instanceof SVGElement && el.localName !== 'svg') continue;
     const r = el.getBoundingClientRect();
     if (r.width < 1 || r.height < 1) continue;
-    if (!M.isRendered(el)) continue;
+    if (!M.isRendered(el) || M.visuallyHidden(el)) continue;
     const s = M.style(el);
     if (M.ignored(el)) continue;
     const rec = {
@@ -175,7 +180,8 @@ export default {
   cross: true,
   /** Per-cell snapshot of colors, taken after the per-cell detectors. */
   async collect(page) {
-    return page.evaluate(collectSnapshot);
+    const painted = await paintedBackground(page).catch(() => null);
+    return page.evaluate(collectSnapshot, painted);
   },
   compare: compareSnapshots,
   /** Turn findings into issues by resolving keys to selectors/rects in the dark page. */

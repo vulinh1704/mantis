@@ -8,7 +8,7 @@
  */
 export function installMantisLib(options = {}) {
   const ignoreSelector = ['[data-mantis-ignore]', ...(options.ignore || [])].join(', ');
-  if (window.__mantis && window.__mantis.v === 4 && window.__mantis.ignoreSelector === ignoreSelector) return true;
+  if (window.__mantis && window.__mantis.v === 5 && window.__mantis.ignoreSelector === ignoreSelector) return true;
 
   const SKIP_TEXT_PARENTS = new Set([
     'script', 'style', 'noscript', 'template', 'title', 'option', 'optgroup', 'select',
@@ -23,6 +23,8 @@ export function installMantisLib(options = {}) {
   let layerCache = new Map();
   const colorCache = new Map();
   let canvasCtx = null;
+  // Set from a screenshot on canvas-based apps, where the DOM background is not what users see.
+  let painted = null;
 
   function reset() {
     styleCache = new Map();
@@ -175,8 +177,12 @@ export function installMantisLib(options = {}) {
     return c[3] > 0 ? [c[0], c[1], c[2], 1] : [255, 255, 255, 1];
   }
 
-  /** Color of the page canvas (html background, else body background, else the UA canvas color). */
+  /**
+   * Color of the page canvas: the painted background when one was measured (see
+   * src/pixels.js paintedBackground), else the html background, else body, else the UA canvas color.
+   */
   function pageBackground() {
+    if (painted) return painted.slice(0, 3);
     const canvas = canvasColor();
     let c = parseColor(style(document.documentElement).backgroundColor);
     if ((!c || c[3] === 0) && document.body) c = parseColor(style(document.body).backgroundColor);
@@ -554,7 +560,10 @@ export function installMantisLib(options = {}) {
   }
 
   window.__mantis = {
-    v: 4,
+    v: 5,
+    setPaintedBackground(rgb) {
+      painted = rgb && rgb.length >= 3 ? [rgb[0], rgb[1], rgb[2]] : null;
+    },
     ignoreSelector,
     INTERACTIVE,
     TARGETS,

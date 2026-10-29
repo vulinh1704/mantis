@@ -233,6 +233,12 @@ the misses, not only the wins.
 - Off-style compares values, not intent. Content that changes between loads,
   such as product demos, carousels and feeds, can show values the learn run
   never saw. Leave such regions out with `--ignore`.
+- Contrast and dark-mode checks read the screenshot when the page code can't
+  tell the background: text on a `<canvas>` (whiteboards, maps, editors) or
+  under transparent layers. Product mockups drawn in HTML on a marketing page
+  are measured like any other text; leave them out with `--ignore` if they are
+  decoration. Text over photos, CSS background images and gradients is still
+  not checked.
 
 ## Why a mantis shrimp?
 
