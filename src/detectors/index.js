@@ -35,8 +35,9 @@ export const CELL_DETECTORS = [
 
 export const CROSS_DETECTORS = [themeLeak];
 
-/** Every issue type Mantis can emit, in report order. */
+/** Every issue type Mantis can emit, in report order. `cover-up` and `lost` come from compare.js. */
 export const ISSUE_TYPES = [
+  'cover-up',
   'page-overflow',
   'clipped-text',
   'overlap',
@@ -47,4 +48,5 @@ export const ISSUE_TYPES = [
   'request-failed',
   'tap-target',
   'layout-shift',
+  'lost',
 ];

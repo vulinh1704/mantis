@@ -9,7 +9,9 @@ import { launchBrowser } from './look.js';
 import { UsageError } from './options.js';
 import { applyDarkStrategy, contextOptions, fontsReady, settle } from './page.js';
 import { formatLocalTime } from './report.js';
-import { BASE_CSS, MOON, SPECTRUM, SUN, escapeHtml, markSvg } from './sheet-style.js';
+import {
+  BASE_CSS, MOON, SUN, arrowValue, brandStyle, escapeHtml, footerHtml, headerHtml, pickSignature, plural, roundStamp, scribbleHtml, statCard, thumbRect,
+} from './sheet-style.js';
 import { firstLine } from './util.js';
 
 /**
@@ -61,15 +63,29 @@ function countsHtml(cell) {
 function deltaHtml(b, a) {
   const be = b.errors || 0;
   const ae = a.errors || 0;
-  if (ae < be) return `<span class="delta good">${be} &rarr; ${ae}</span>`;
-  if (ae > be) return `<span class="delta bad">${be} &rarr; ${ae}</span>`;
-  return `<span class="delta same">${ae === 0 ? 'clean' : `${ae} &rarr; ${ae}`}</span>`;
+  if (ae === 0 && be === 0) return '<span class="delta same">clean</span>';
+  const tone = ae === 0 ? 'good' : ae >= be ? 'bad' : 'some';
+  return `<span class="delta ${tone}"><small>${be}</small> &rarr; <b>${ae}</b></span>`;
+}
+
+function summaryText(before, after, vs) {
+  const be = before.summary.errors;
+  const ae = after.summary.errors;
+  let text;
+  if (be === 0 && ae === 0) text = '<strong class="ok">No errors</strong> before or after the change.';
+  else if (ae === 0) text = `<strong class="err">${plural(be, 'error')}</strong> before; <strong class="ok">0 remaining</strong> after the patch.`;
+  else text = `<strong class="err">${plural(be, 'error')}</strong> before; <strong class="err">${ae} ${ae === 1 ? 'remains' : 'remain'}</strong>. Review the unresolved findings.`;
+  if (vs) text += ` ${vs.fixed.length} fixed, ${vs.new.length} new, <strong class="${vs.coverUps ? 'err' : 'ok'}">${plural(vs.coverUps, 'cover-up')}</strong>.`;
+  return text;
 }
 
 /**
  * Before/after sheet. Same grid as the contact sheet (rows = route + locale, columns = viewport
  * x scheme), but every cell holds the before screenshot on the left and the after one on the
  * right, with per-cell counts and run totals. Only cells present in both runs are compared.
+ * When the after run was compared with the before run (look --baseline), its fixed / new /
+ * cover-up counts are shown too. One finding is circled: a cover-up on the after side, or else
+ * an issue that the after run no longer has, on both sides.
  */
 export function proofHtml(before, after, beforeDir, afterDir) {
   const afterBy = new Map(after.cells.map((c) => [cellKey(c), c]));
@@ -87,13 +103,36 @@ export function proofHtml(before, after, beforeDir, afterDir) {
   const schemes = keep(after.matrix.schemes, 'scheme');
   const cols = [];
   for (const v of viewports) for (const s of schemes) cols.push({ v, s, w: Math.max(96, Math.round((THUMB_H * v.width) / v.height)) });
+  const widthOf = (cell) => cols.find((c) => c.v.name === cell.viewport && c.s === cell.scheme)?.w ?? 0;
+  // A fix moves things, so the circle is drawn at the same place on both sides only when the
+  // page is equally wide in both screenshots.
+  const fits = (cell, rect) => {
+    const p = pairs.get(cellKey(cell));
+    return !!p && !!thumbRect(cell, rect, widthOf(cell), THUMB_H) && (p.a.shotWidth || p.a.width) === (p.b.shotWidth || p.b.width);
+  };
+  const vs = after.baseline && after.baseline.runId === before.runId ? after.baseline : null;
+  const marks = new Map(); // cellKey + side -> {rect, note, tone}
+  const cover = pickSignature(after, fits, (i) => i.type === 'cover-up');
+  if (cover) {
+    marks.set(`${cellKey(cover.cell)}|after`, { rect: cover.rect, note: 'hidden, not fixed', tone: 'err' });
+  } else {
+    const remaining = new Set(after.issues.map((i) => i.fingerprint));
+    const fixed = pickSignature(before, fits, (i) => i.fingerprint && !remaining.has(i.fingerprint));
+    if (fixed) {
+      marks.set(`${cellKey(fixed.cell)}|before`, { rect: fixed.rect, note: `found at ${fixed.cell.width} px`, tone: 'err' });
+      marks.set(`${cellKey(fixed.cell)}|after`, { rect: fixed.rect, note: 'fixed', tone: 'ok' });
+    }
+  }
   const src = (dir, cell) => (cell && cell.screenshot ? pathToFileURL(path.join(dir, cell.screenshot)).href : null);
 
   const thumb = (dir, cell, w, which) => {
     const s = src(dir, cell);
     const dim = cell && cell.status !== 'ok' ? ' dim' : '';
-    return `<figure><div class="shot${dim}" style="width:${w}px;height:${THUMB_H}px">${s ? `<img src="${escapeHtml(s)}" alt="">` : ''}</div>` +
-      `<figcaption><span class="tag ${which}">${which === 'before' ? 'BEFORE' : 'AFTER'}</span>${countsHtml(cell)}</figcaption></figure>`;
+    const mark = cell && marks.get(`${cellKey(cell)}|${which}`);
+    const spot = mark && thumbRect(cell, mark.rect, w, THUMB_H);
+    const scribble = spot ? scribbleHtml(spot, w, THUMB_H, mark.note, mark.tone) : '';
+    return `<figure><div class="shot${dim}" style="width:${w}px;height:${THUMB_H}px">${s ? `<img src="${escapeHtml(s)}" alt="">` : ''}${scribble}</div>` +
+      `<figcaption class="${which}"><span class="tag">${which === 'before' ? 'Before' : 'After'}</span>${countsHtml(cell)}</figcaption></figure>`;
   };
 
   const rows = [];
@@ -115,42 +154,40 @@ export function proofHtml(before, after, beforeDir, afterDir) {
 
   const bs = before.summary;
   const as = after.summary;
-  const stat = (cls, value, label) => `<div class="stat ${cls}"><b>${value}</b><span>${label}</span></div>`;
-  const totals = [
-    stat(as.errors ? 'err' : 'ok', `${bs.errors}&rarr;${as.errors}`, 'errors'),
-    stat(as.warnings ? 'warn' : 'ok', `${bs.warnings}&rarr;${as.warnings}`, 'warnings'),
-    stat('', pairs.size, 'cells compared'),
+  const stats = [
+    statCard(arrowValue(bs.errors, as.errors, as.errors ? 'err' : 'ok'), 'errors', { note: as.errors ? `${as.errors} left` : bs.errors ? 'all fixed' : 'none' }),
+    statCard(arrowValue(bs.warnings, as.warnings, as.warnings ? 'warn' : 'ok'), 'warnings', { note: as.warnings ? `${as.warnings} left` : bs.warnings ? 'all fixed' : 'none' }),
+    vs ? statCard(vs.coverUps, vs.coverUps === 1 ? 'cover-up' : 'cover-ups', { tone: vs.coverUps ? 'err' : 'ok', note: vs.coverUps ? 'hidden, not fixed' : 'honest fix' }) : '',
+    statCard(pairs.size, 'cells', { note: 'compared' }),
   ].join('');
-  const colTemplate = cols.map((c) => `${2 * c.w + 10 + 24}px`).join(' ');
-  const verdict = as.errors === 0 ? 'no error-level issues left' : `${as.errors} error-level issue${as.errors === 1 ? '' : 's'} left`;
+  const colTemplate = cols.map((c) => `${2 * c.w + 12 + 26}px`).join(' ');
+  const project = after.project ?? before.project ?? null;
+  const when = `${escapeHtml(formatLocalTime(before.startedAt))} &rarr; ${escapeHtml(formatLocalTime(after.startedAt))}`;
+  const meta = before.url === after.url ? `${escapeHtml(after.url)} · ${when}` : `${escapeHtml(before.url)} &rarr; ${escapeHtml(after.url)} · ${when}`;
 
   return `<!doctype html><html><head><meta charset="utf-8"><title>Mantis proof</title><style>${BASE_CSS}
-.grid { display:grid; grid-template-columns: 150px ${colTemplate}; gap:16px; align-items:start; }
-.pair { background:rgba(255,255,255,.035); border:1px solid var(--line); border-radius:16px; padding:10px 12px 12px; }
-.pairhead { display:flex; align-items:center; gap:7px; margin-bottom:9px; color:#c3c8da; font-size:12px; }
-.pairhead b { text-transform:uppercase; letter-spacing:.09em; font-weight:700; }
+.grid { display:grid; grid-template-columns: 170px ${colTemplate}; gap:18px; align-items:start; }
+.pair { background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:11px 12px 12px; box-shadow:0 1px 0 rgba(32,36,31,.04), 0 12px 26px -18px rgba(32,36,31,.5); }
+.pairhead { display:flex; align-items:center; gap:7px; margin-bottom:10px; color:var(--ink); font-size:12px; }
+.pairhead b { text-transform:uppercase; letter-spacing:.12em; font-weight:800; }
 .pairhead em { font-style:normal; color:var(--muted); }
-.delta { margin-left:auto; padding:2px 9px; border-radius:999px; font-weight:800; font-size:12px; white-space:nowrap; }
-.delta.good { background:rgba(47,210,127,.16); color:var(--ok); }
-.delta.bad { background:rgba(255,45,85,.16); color:var(--err); }
-.delta.same { background:rgba(255,255,255,.06); color:var(--muted); }
-.thumbs { display:flex; gap:10px; }
+.delta { margin-left:auto; padding:2px 8px; border-radius:4px; border:1.5px solid var(--line); font-size:13px; font-weight:800; white-space:nowrap; color:var(--ink); }
+.delta small { font-size:13px; color:var(--muted); font-weight:700; }
+.delta.good b { color:var(--ok); } .delta.good { border-color:var(--ok); }
+.delta.bad b, .delta.some b { color:var(--err); } .delta.bad { border-color:var(--err); }
+.delta.same { color:var(--muted); }
+.pair .shot { border-radius:6px; box-shadow:none; }
+.thumbs { display:flex; gap:12px; }
 figure { margin:0; }
-figcaption { display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin-top:7px; font-size:11px; font-weight:700; color:#d5d9e6; }
-.tag { padding:2px 6px; border-radius:5px; font-size:10px; font-weight:800; letter-spacing:.1em; color:#fff; }
-.tag.before { background:#ff2d55; } .tag.after { background:#16a34a; }
+figcaption { display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin-top:7px; padding:4px 6px; border-radius:4px; font-size:11px; font-weight:700; }
+figcaption.before { background:#efe9de; } figcaption.after { background:var(--ok-soft); }
+.tag { font-size:10px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:var(--ink); }
+figcaption.after .tag { color:var(--ok); }
 .good { color:var(--ok); } .bad { color:var(--err); } .warnc { color:var(--warn); } .muted { color:var(--muted); }
-</style></head><body>
-<header>
-  <div>
-    <div class="brand">${markSvg(46)}<div><div class="title">Mantis<small>before / after</small></div>
-    <div class="sub"><code>${escapeHtml(before.url)}</code> ${escapeHtml(formatLocalTime(before.startedAt))} &rarr; <code>${escapeHtml(after.url)}</code> ${escapeHtml(formatLocalTime(after.startedAt))}</div></div></div>
-    <div class="spectrum">${SPECTRUM.map((c) => `<i style="background:${c}"></i>`).join('')}</div>
-  </div>
-  <div class="totals">${totals}</div>
-</header>
+</style></head><body${brandStyle(project)}>
+${headerHtml({ project, url: after.url, title: 'Fix receipt', round: roundStamp(2, 'Verify'), summary: summaryText(before, after, vs), meta, stats })}
 <div class="grid">${rows.join('')}</div>
-<footer><div><b>mantis</b> proof · before ${escapeHtml(before.runId)} · after ${escapeHtml(after.runId)}${skipped ? ` · ${skipped} cell${skipped === 1 ? '' : 's'} present in only one run not compared` : ''}</div><div>${verdict}</div></footer>
+${footerHtml(`before ${escapeHtml(before.runId)} · after ${escapeHtml(after.runId)}${skipped ? ` · ${plural(skipped, 'cell')} present in only one run not compared` : ''}`)}
 </body></html>`;
 }
 

@@ -1,11 +1,18 @@
 /**
- * page-overflow (error): the document scrolls horizontally.
+ * page-overflow (error): content wider than the viewport.
  *
- * Fires only when `scrollWidth > clientWidth + 1` and the viewport is actually scrollable
- * (html/body overflow-x is not hidden/clip). Reports the outermost culprits: elements whose
- * right edge passes the viewport and whose parent does not, skipping fixed-position layers and
- * anything clipped by an overflow ancestor. When several siblings overflow the same parent the
- * parent is reported once (e.g. a nowrap flex row), which is where the fix usually goes.
+ * - The document scrolls horizontally (`scrollWidth > clientWidth + 1`): reports the outermost
+ *   culprits, elements whose right edge passes the viewport and whose parent does not, skipping
+ *   fixed-position layers and anything clipped by an overflow ancestor. When several siblings
+ *   overflow the same parent the parent is reported once (e.g. a nowrap flex row), which is where
+ *   the fix usually goes.
+ * - The overflow is masked: `overflow-x: hidden/clip` on html, body or an app root (up to two
+ *   levels below body, full width, at least half the page tall) cuts the same culprits off at the
+ *   viewport edge instead of letting
+ *   the page scroll. That hides the symptom, not the bug, so it is reported the same way with the
+ *   masking rule as evidence. Only culprits that start inside the viewport and carry text, a
+ *   control or media count; aria-hidden decoration, transformed layers (carousels, off-canvas
+ *   drawers) and anything clipped by a smaller container are left alone.
  */
 export default {
   name: 'page-overflow',
@@ -19,19 +26,48 @@ export default {
       if (!body) return [];
       const vw = html.clientWidth;
       const docWidth = Math.max(html.scrollWidth, body.scrollWidth);
-      if (docWidth <= vw + 1) return [];
+      const hides = (s) => s.overflowX === 'hidden' || s.overflowX === 'clip';
       const hs = M.style(html);
       const bs = M.style(body);
-      const viewportOverflow = hs.overflowX !== 'visible' ? hs.overflowX : bs.overflowX;
-      if (viewportOverflow === 'hidden' || viewportOverflow === 'clip') return [];
+      const viewportMask = hides(hs) ? { selector: 'html', value: hs.overflowX } : hides(bs) ? { selector: 'body', value: bs.overflowX } : null;
+      const docHeight = Math.max(html.scrollHeight, body.scrollHeight);
+      const roots = new Map();
+      for (const a of body.children) {
+        for (const n of [a, ...a.children]) {
+          if (M.inOverlay(n) || !hides(M.style(n))) continue;
+          const r = n.getBoundingClientRect();
+          if (r.left <= 1 && r.right >= vw - 1 && r.height >= docHeight / 2) roots.set(n, { selector: M.cssPath(n), value: M.style(n).overflowX });
+        }
+      }
+      const scrolls = docWidth > vw + 1 && !viewportMask;
+      if (!scrolls && !viewportMask && roots.size === 0) return [];
 
       const limit = vw + 1;
+      const xClip = (s) => s.overflowX !== 'visible' || /paint|strict|content/.test(s.contain || '');
+      // 'clipped' by a container, cut by a mask ({selector, value}), or 'none' (sticks out for real).
+      const clipOf = (el) => {
+        let mask = null;
+        for (const c of M.clipChain(el)) {
+          if (!xClip(M.style(c))) continue;
+          if (!roots.has(c)) return 'clipped';
+          mask = roots.get(c);
+        }
+        return mask || viewportMask || 'none';
+      };
+      const transformed = (el) => {
+        for (let n = el; n && n !== body; n = n.parentElement) {
+          const s = M.style(n);
+          if ((s.transform && s.transform !== 'none') || (s.translate && s.translate !== 'none')) return true;
+        }
+        return false;
+      };
+      const hasContent = (el) => M.REPLACED.has(el.localName) || el.matches(M.TARGETS) ||
+        !!el.querySelector(`${M.TARGETS}, img, svg, video, canvas, picture`) || /\S/.test(el.innerText || '');
+      // A masked culprit only matters when the user would see it cut: it starts on screen and has content.
+      const visiblyCut = (el, r) => r.left + scrollX < vw - 1 && !M.ariaHidden(el) && !transformed(el) && hasContent(el);
+
       const over = new Set();
       const culprits = [];
-      const clippedX = (el) => M.clipChain(el).some((c) => {
-        const s = M.style(c);
-        return s.overflowX !== 'visible' || /paint|strict|content/.test(s.contain || '');
-      });
       const skip = new Set(['script', 'style', 'template', 'noscript', 'link', 'meta']);
       let ignoredCulprit = false;
       for (const el of [body, ...body.querySelectorAll('*')]) {
@@ -45,28 +81,33 @@ export default {
         if (r.width === 0 && r.height === 0) continue;
         if (r.right + scrollX <= limit) continue;
         if (M.layerKind(el) === 'fixed') continue;
-        if (clippedX(el)) continue;
+        const clip = el === body ? viewportMask || 'none' : clipOf(el);
+        if (clip === 'clipped' || (clip === 'none' && !scrolls)) continue;
         over.add(el);
         if (el !== body && over.has(el.parentElement)) continue; // not outermost
-        culprits.push(el);
+        if (clip !== 'none' && !visiblyCut(el, r)) continue;
+        culprits.push({ el, mask: clip === 'none' ? null : clip });
       }
 
       // Text that sticks out of its element (long unbreakable strings) has no element culprit.
       if (culprits.length === 0) {
         for (const t of M.textNodes(body, 8000)) {
           const owner = t.parentElement;
-          if (M.layerKind(owner) === 'fixed' || clippedX(owner)) continue;
+          if (M.layerKind(owner) === 'fixed') continue;
+          const clip = clipOf(owner);
+          if (clip === 'clipped' || (clip === 'none' && !scrolls)) continue;
+          if (clip !== 'none' && (M.ariaHidden(owner) || transformed(owner))) continue;
           const rects = M.textRects(t);
-          if (rects.some((r) => r.right + scrollX > limit)) {
-            if (!culprits.includes(owner)) culprits.push(owner);
+          if (rects.some((r) => r.right + scrollX > limit && (clip === 'none' || r.left + scrollX < vw - 1))) {
+            if (!culprits.some((c) => c.el === owner)) culprits.push({ el: owner, mask: clip === 'none' ? null : clip });
             if (culprits.length >= 5) break;
           }
         }
       }
 
-      if (culprits.length === 0 && ignoredCulprit) return [];
+      if (culprits.length === 0 && (ignoredCulprit || !scrolls)) return [];
       const issues = [];
-      const evidenceFor = (el) => {
+      const evidenceFor = (el, mask) => {
         const r = el.getBoundingClientRect();
         const s = M.style(el);
         return {
@@ -79,8 +120,10 @@ export default {
           minWidth: s.minWidth,
           whiteSpace: s.whiteSpace,
           position: s.position,
+          ...(mask ? { maskedBy: mask.selector, maskValue: mask.value } : {}),
         };
       };
+      const masked = (mask) => (mask ? `; \`${mask.selector} { overflow-x: ${mask.value} }\` only hides the part that is cut off` : ', so the page scrolls horizontally');
 
       if (culprits.length === 0) {
         issues.push({
@@ -96,37 +139,38 @@ export default {
 
       // Group siblings that overflow the same parent.
       const byParent = new Map();
-      for (const el of culprits) {
-        const p = el === body ? null : el.parentElement;
-        const key = p || el;
+      for (const c of culprits) {
+        const p = c.el === body ? null : c.el.parentElement;
+        const key = p || c.el;
         if (!byParent.has(key)) byParent.set(key, []);
-        byParent.get(key).push(el);
+        byParent.get(key).push(c);
       }
-      for (const [parent, els] of byParent) {
-        if (els.length >= 2 && parent !== body && parent !== html) {
-          const maxRight = Math.max(...els.map((e) => e.getBoundingClientRect().right + scrollX));
+      for (const [parent, list] of byParent) {
+        if (list.length >= 2 && parent !== body && parent !== html) {
+          const mask = list[0].mask;
+          const maxRight = Math.max(...list.map((c) => c.el.getBoundingClientRect().right + scrollX));
           const sel = M.cssPath(parent);
-          const ev = evidenceFor(parent);
+          const ev = evidenceFor(parent, mask);
           ev.overflowBy = Math.round(maxRight - vw);
-          ev.children = els.slice(0, 6).map((e) => M.cssPath(e));
+          ev.children = list.slice(0, 6).map((c) => M.cssPath(c.el));
           issues.push({
             type: 'page-overflow',
             severity: 'error',
             selector: sel,
             rect: M.round(M.docRect(parent)),
-            message: `${els.length} children of \`${sel}\` extend up to ${ev.overflowBy}px past the ${vw}px viewport, so the page scrolls horizontally (white-space: ${ev.whiteSpace}). Let the row wrap or shrink.`,
+            message: `${list.length} children of \`${sel}\` extend up to ${ev.overflowBy}px past the ${vw}px viewport${masked(mask)} (white-space: ${ev.whiteSpace}). Let the row wrap or shrink.`,
             evidence: ev,
           });
         } else {
-          for (const el of els) {
+          for (const { el, mask } of list) {
             const sel = M.cssPath(el);
-            const ev = evidenceFor(el);
+            const ev = evidenceFor(el, mask);
             issues.push({
               type: 'page-overflow',
               severity: 'error',
               selector: sel,
               rect: M.round(M.docRect(el)),
-              message: `\`${sel}\` is ${ev.width}px wide and extends ${ev.overflowBy}px past the ${vw}px viewport, so the page scrolls horizontally.`,
+              message: `\`${sel}\` is ${ev.width}px wide and extends ${ev.overflowBy}px past the ${vw}px viewport${masked(mask)}.`,
               evidence: ev,
             });
           }
