@@ -1,6 +1,6 @@
 {
   "name": "@vulinh1704/mantis",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Give your coding agent eyes for UI work: sweep viewports x color schemes x locales in a real browser, detect layout, contrast, dark-mode and i18n bugs with evidence, and get annotated screenshots plus a compact report.",
   "type": "module",
   "bin": {
@@ -12,7 +12,8 @@
   "files": [
     "bin",
     "src",
-    "skills"
+    "skills",
+    "assets/mantis-128.png"
   ],
   "engines": {
     "node": ">=20"

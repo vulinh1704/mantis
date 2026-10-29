@@ -35,6 +35,12 @@ in <out>/latest.
   --ignore <selector>          skip matching elements and their subtree in every
                                detector (repeatable); pages can also mark elements
                                with the data-mantis-ignore attribute
+  --baseline auto|none|<runDir>
+                               run to compare with (default auto: the previous run
+                               of the same URL in <out>/runs). An issue that is gone
+                               because its element was hidden, removed, shrunk or
+                               cut off is a cover-up error; a control or heading
+                               that disappeared is a lost warning
 
 proof: side-by-side before/after sheet of two runs (run dirs, or the aliases
 latest / prev / first under .mantis), written to --out (default .mantis/proof.png).
@@ -86,6 +92,8 @@ export async function main(argv = process.argv.slice(2), { stdout = process.stdo
         out('');
         out(`Mantis: ${s.errors} error${s.errors === 1 ? '' : 's'}, ${s.warnings} warning${s.warnings === 1 ? '' : 's'} in ${s.cells} cells${s.failedCells ? ` (${s.failedCells} failed)` : ''}`);
         if (types) out(`  ${types}`);
+        const b = res.report.baseline;
+        if (b) out(`  vs ${b.runId}: ${b.fixed.length} fixed · ${b.new.length} new · ${b.coverUps} cover-up${b.coverUps === 1 ? '' : 's'} · ${b.lost} lost`);
         out(`  report  ${rel(path.join(res.latestDir, 'report.md'))}`);
         out(`  sheet   ${rel(path.join(res.latestDir, 'contact-sheet.png'))}`);
         out(`  run     ${rel(res.runDir)}`);

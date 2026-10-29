@@ -27,6 +27,12 @@ No before run yet? Check out the base branch in a separate worktree
 mantis proof --before .mantis/runs/<before> --after .mantis/runs/<after> --out mantis-proof.png
 ```
 
+When the after run was compared with the before run (it was the previous run, or
+`mantis look --baseline <before>`), the sheet also shows fixed, new and cover-up
+counts. The sheet carries the project's name and repo link (from package.json and
+the git remote); a `.mantis.json` can set `name`, `logo`, `brandColor`, `repo` and
+`qr`.
+
 ## 3. Optional video (needs ffmpeg)
 
 With both versions running:
@@ -42,9 +48,10 @@ If `mantis` isn't installed, use `npx -y @vulinh1704/mantis …`.
 Attach the image (and video) with three lines:
 1. what was broken;
 2. the root cause you fixed;
-3. error counts before → after.
+3. error counts before → after, and the cover-up count when the sheet has one.
 
-Never claim a fix that the after run doesn't show.
+Never claim a fix that the after run doesn't show, and never post a sheet with
+cover-ups on it as a fix.
 
 ## Privacy
 

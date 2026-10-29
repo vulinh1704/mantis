@@ -57,7 +57,7 @@ Then someone opens the page on a phone:
    screenshots.
 2. **Fix.** `/mantis-fix` fixes causes, not symptoms. It never puts
    `overflow-x: hidden` on the body, shrinks text until it fits, or turns dark
-   mode off.
+   mode off, and the next run checks that it didn't.
 3. **Prove.** `/mantis-proof` makes a before/after sheet, and optionally a
    video, for your pull request.
 
@@ -66,12 +66,45 @@ mantis look http://localhost:3000 --routes /,/settings --locales en,vi
 ```
 
 <p align="center">
-  <img src="assets/proof.png" width="880" alt="Mantis proof: the same 24 screens before and after the fixes, errors going from 14 to 0">
+  <img src="assets/proof.png" width="880" alt="Mantis fix receipt: the same 24 screens before and after the fixes, errors going from 14 to 0, with 0 cover-ups">
 </p>
+
+## Fixed, or just hidden?
+
+An agent told to make the report clean can make it clean without fixing
+anything. Every `mantis look` compares itself with the previous run of the same
+URL, so these tricks don't work:
+
+| Trick | What Mantis reports |
+|---|---|
+| `overflow-x: hidden` on `html`, `body` or the app root | The overflow, still: the element that is cut off, and the rule that hides it |
+| Hide the broken element (`display: none`, `visibility: hidden`, `opacity: 0`) | `cover-up`: the issue is gone, but so is the element |
+| Hide the *other* element of an overlap | `cover-up` on that element |
+| Shrink the text until it fits | `cover-up`: 16px → 7px |
+| Clip it, or cut the text short | `cover-up`: less of it is visible, or fewer characters |
+| A button, link or heading quietly disappears | `lost` warning |
+
+A cover-up is an error, so the run still fails. When the fix is honest, the run
+ends with a receipt:
+
+```
+Mantis: 0 errors, 0 warnings in 24 cells
+  vs 2026-10-29T11-51-22: 18 fixed · 0 new · 0 cover-ups · 0 lost
+```
+
+## Your project on the sheets
+
+The contact sheet and the proof carry your project's name and a link and QR code
+to its repo, read from `package.json` and the git remote. Add a `.mantis.json` to
+change them:
+
+```json
+{ "name": "Lumen", "logo": "public/logo.svg", "brandColor": "#4f46e5", "repo": "acme/lumen", "qr": true }
+```
 
 ## Install
 
-> Mantis is in early development (v0.1). Expect rough edges, and please [open an issue](https://github.com/vulinh1704/mantis/issues) when it gets something wrong.
+> Mantis is in early development (v0.2). Expect rough edges, and please [open an issue](https://github.com/vulinh1704/mantis/issues) when it gets something wrong.
 
 **Claude Code**
 
@@ -103,6 +136,15 @@ What has been measured so far:
   of them in exactly the screen, theme and language cells where it was planted,
   and nothing else. On `fixtures/clean-app`, the same app with every bug fixed,
   it reports zero issues. Both checks run in CI.
+- **Cover-ups.** Four tricks applied to `buggy-app` behind the same URL (hide
+  the overflow with `overflow-x: hidden`, hide the menu button, hide the button
+  it overlaps, shrink a label to 7px) are all still reported or flagged as
+  cover-ups. Swapping in `clean-app`, the honest fix, gives every issue fixed,
+  0 new, 0 cover-ups and 0 lost. This runs in CI too.
+- **Cover-up false alarms.** Two runs in a row on tailwindcss.com, vercel.com,
+  notion.com and stripe.com reported 0 cover-ups and 0 lost controls. On
+  vnexpress.net, where the news changes between runs, they reported 0 cover-ups
+  and one grouped "lost" warning. Checked on 2026-10-29.
 - **Real sites.** On 10 public sites (example.com, playwright.dev, Hacker News,
   tailwindcss.com, MDN, svelte.dev, react.dev, gov.uk, vercel.com and
   stripe.com), 18 of the 21 errors it reported held up when checked by hand.
@@ -119,10 +161,9 @@ the misses, not only the wins.
   design skill.
 - It doesn't click through flows or check hover and focus states yet.
 - It doesn't measure animation smoothness yet.
-- It can be fooled by fixes that only hide a problem. For example,
-  `overflow-x: hidden` on the body hides a page overflow, and hiding an
-  element hides its overlap. `/mantis-fix` is told never to do this, and
-  catching it automatically is the next feature.
+- Cover-up checks need a previous run of the same URL to compare with. Layout
+  shift, console and network issues change by themselves on live pages, so they
+  are not checked for cover-ups.
 
 ## Why a mantis shrimp?
 

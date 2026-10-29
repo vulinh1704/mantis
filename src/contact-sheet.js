@@ -2,13 +2,37 @@ import { rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { formatLocalTime } from './report.js';
-import { BASE_CSS, MOON, SPECTRUM, SUN, badgesHtml, escapeHtml, markSvg } from './sheet-style.js';
+import {
+  BASE_CSS, MOON, SUN, badgesHtml, escapeHtml, footerHtml, headerHtml, brandStyle, pickSignature, plural, roundStamp, scribbleHtml, statCard, thumbRect,
+} from './sheet-style.js';
 
 const TILE_H = 300;
 
+/** "2 routes × 3 viewports × light/dark × en, vi" */
+export function matrixText(m) {
+  return [
+    plural(m.routes.length, 'route'),
+    plural(m.viewports.length, 'viewport'),
+    m.schemes.join('/'),
+    m.locales.join(', '),
+  ].join(' × ');
+}
+
+function summaryText(report) {
+  const s = report.summary;
+  const found = s.errors || s.warnings
+    ? `<strong class="${s.errors ? 'err' : 'warn'}">${plural(s.errors, 'error')}</strong> and ${plural(s.warnings, 'warning')} across ${s.cells} cells`
+    : `<strong class="ok">No issues</strong> in ${s.cells} cells`;
+  let text = `${found}: ${escapeHtml(matrixText(report.matrix))}.`;
+  const b = report.baseline;
+  if (b) text += ` Since the last run: ${b.fixed.length} fixed, ${b.new.length} new, <strong class="${b.coverUps ? 'err' : 'ok'}">${plural(b.coverUps, 'cover-up')}</strong>.`;
+  return text;
+}
+
 /**
  * Contact sheet HTML: rows = route + locale, columns = viewport x scheme, each tile showing the
- * first screen of the annotated screenshot with an error/warning badge.
+ * first screen of the annotated screenshot with its error/warning badges. The most telling
+ * finding gets a hand-drawn circle.
  * @param {object} report  report.json object
  */
 export function contactSheetHtml(report) {
@@ -17,11 +41,14 @@ export function contactSheetHtml(report) {
   for (const v of m.viewports) {
     for (const s of m.schemes) cols.push({ v, s, w: Math.max(110, Math.round((TILE_H * v.width) / v.height)) });
   }
+  const widthOf = (cell) => cols.find((c) => c.v.name === cell.viewport && c.s === cell.scheme)?.w ?? 0;
+  const sig = pickSignature(report, (cell, rect) => !!thumbRect(cell, rect, widthOf(cell), TILE_H));
+
   const s = report.summary;
   const stats = [
-    `<div class="stat ${s.errors ? 'err' : 'ok'}"><b>${s.errors}</b><span>error${s.errors === 1 ? '' : 's'}</span></div>`,
-    `<div class="stat ${s.warnings ? 'warn' : 'ok'}"><b>${s.warnings}</b><span>warning${s.warnings === 1 ? '' : 's'}</span></div>`,
-    `<div class="stat"><b>${s.cells}</b><span>cells</span></div>`,
+    statCard(s.errors, s.errors === 1 ? 'error' : 'errors', { tone: s.errors ? 'err' : 'ok', note: s.errors ? 'needs a fix' : 'clean' }),
+    statCard(s.warnings, s.warnings === 1 ? 'warning' : 'warnings', { tone: s.warnings ? 'warn' : 'ok', note: s.warnings ? 'worth a look' : 'none' }),
+    statCard(s.cells, 'cells', { note: `${m.viewports.length} × ${m.schemes.length} × ${m.locales.length * m.routes.length}` }),
   ].join('');
 
   const colHeads = cols
@@ -40,25 +67,32 @@ export function contactSheetHtml(report) {
         if (cell && cell.status === 'not-localized') stamp = `<div class="stamp">not localized · same text as ${escapeHtml(m.locales[0])}</div>`;
         if (cell && cell.status === 'failed') stamp = `<div class="stamp">failed to load</div>`;
         if (!cell) stamp = '<div class="stamp">not run</div>';
-        rows.push(`<div class="shot${dim}" style="width:${c.w}px;height:${TILE_H}px">${img}${badgesHtml(cell)}${stamp}</div>`);
+        let mark = '';
+        if (sig && cell === sig.cell) {
+          const note = sig.issue.type === 'cover-up' ? 'hidden, not fixed' : `found at ${cell.width} px`;
+          mark = scribbleHtml(thumbRect(cell, sig.rect, c.w, TILE_H), c.w, TILE_H, note);
+        }
+        rows.push(`<div class="shot${dim}" style="width:${c.w}px;height:${TILE_H}px">${img}${mark}${badgesHtml(cell)}${stamp}</div>`);
       }
     }
   }
 
+  const project = report.project ?? null;
   return `<!doctype html><html><head><meta charset="utf-8"><title>Mantis contact sheet</title><style>${BASE_CSS}
-.grid { display:grid; grid-template-columns: 170px ${cols.map((c) => `${c.w}px`).join(' ')}; gap:16px 16px; align-items:start; }
-.grid > .colhead { padding-bottom:2px; }
-</style></head><body>
-<header>
-  <div>
-    <div class="brand">${markSvg(46)}<div><div class="title">Mantis<small>UI sweep</small></div>
-    <div class="sub"><code>${escapeHtml(report.url)}</code> · ${escapeHtml(formatLocalTime(report.startedAt))}</div></div></div>
-    <div class="spectrum">${SPECTRUM.map((c) => `<i style="background:${c}"></i>`).join('')}</div>
-  </div>
-  <div class="totals">${stats}</div>
-</header>
+.grid { display:grid; grid-template-columns: 180px ${cols.map((c) => `${c.w}px`).join(' ')}; gap:18px 18px; align-items:start; }
+.grid > .colhead { padding-bottom:4px; }
+</style></head><body${brandStyle(project)}>
+${headerHtml({
+    project,
+    url: report.url,
+    title: 'Field report',
+    round: roundStamp(1, 'Detect'),
+    summary: summaryText(report),
+    meta: `${escapeHtml(report.url)} · ${escapeHtml(formatLocalTime(report.startedAt))} · run ${escapeHtml(report.runId)}`,
+    stats,
+  })}
 <div class="grid"><div></div>${colHeads}${rows.join('')}</div>
-<footer><div><b>mantis</b> · sees 12 color channels. you see 3. your agent sees 0.</div><div>run ${escapeHtml(report.runId)} · dark strategy ${escapeHtml(m.darkStrategy)} · ${(report.durationMs / 1000).toFixed(1)}s</div></footer>
+${footerHtml(`dark strategy ${escapeHtml(m.darkStrategy)} · ${(report.durationMs / 1000).toFixed(1)}s`)}
 </body></html>`;
 }
 
@@ -71,7 +105,7 @@ export function contactSheetHtml(report) {
  */
 export async function renderHtmlToPng(browser, html, htmlPath, outPng) {
   await writeFile(htmlPath, html);
-  const context = await browser.newContext({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1, colorScheme: 'dark' });
+  const context = await browser.newContext({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1, colorScheme: 'light' });
   const page = await context.newPage();
   try {
     await page.goto(pathToFileURL(htmlPath).href, { waitUntil: 'load', timeout: 60000 });

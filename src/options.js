@@ -37,6 +37,7 @@ export const LOOK_DEFAULTS = Object.freeze({
   json: false,
   concurrency: 3,
   timeout: 30000,
+  baseline: 'auto',
 });
 
 /**
@@ -158,6 +159,7 @@ const LOCALE_RE = /^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$/;
  * @property {number} concurrency
  * @property {number} timeout
  * @property {string[]} ignore  CSS selectors excluded from every detector (plus [data-mantis-ignore]).
+ * @property {string} baseline  run to compare with: 'auto' (previous run of the same URL), 'none' or a run directory.
  */
 
 /**
@@ -184,6 +186,7 @@ export function parseLookArgs(argv) {
         concurrency: { type: 'string' },
         timeout: { type: 'string' },
         ignore: { type: 'string', multiple: true },
+        baseline: { type: 'string' },
       },
     });
   } catch (err) {
@@ -245,7 +248,15 @@ export function parseLookArgs(argv) {
     concurrency: parseIntOpt('concurrency', values.concurrency, 1, 16) ?? LOOK_DEFAULTS.concurrency,
     timeout: parseIntOpt('timeout', values.timeout, 1000, 600000) ?? LOOK_DEFAULTS.timeout,
     ignore: (values.ignore ?? []).map((s) => s.trim()).filter(Boolean),
+    baseline: parseBaseline(values.baseline),
   };
+}
+
+function parseBaseline(value) {
+  if (value === undefined) return LOOK_DEFAULTS.baseline;
+  const v = value.trim();
+  if (!v) throw new UsageError('--baseline is empty (use auto, none or a run directory)');
+  return v;
 }
 
 /**

@@ -89,11 +89,27 @@ describe('page-overflow', () => {
     assert.deepEqual(sels(issues), ['#row']);
   });
 
-  test('quiet when overflow is clipped, scrollable, fixed, or hidden on the viewport', async () => {
+  test('quiet when overflow is clipped by a component, scrollable or fixed', async () => {
     assert.deepEqual(await detect(pageOverflow, '<div style="overflow-x:auto"><div style="width:900px">scroller</div></div>', { viewport: 'mobile' }), []);
-    assert.deepEqual(await detect(pageOverflow, '<div style="overflow:hidden"><div style="width:900px">clipped</div></div>', { viewport: 'mobile' }), []);
+    assert.deepEqual(await detect(pageOverflow, '<div style="overflow:hidden"><div style="width:900px">clipped</div></div><p style="height:900px">rest of the page</p>', { viewport: 'mobile' }), []);
     assert.deepEqual(await detect(pageOverflow, '<div style="position:fixed;left:0;top:0;width:900px">fixed</div>', { viewport: 'mobile' }), []);
-    assert.deepEqual(await detect(pageOverflow, '<div style="width:900px">hidden</div>', { viewport: 'mobile', css: 'body{overflow-x:hidden}' }), []);
+  });
+
+  test('overflow hidden on html, body or the app root does not hide the culprit', async () => {
+    const onBody = await detect(pageOverflow, '<div id="wide" style="width:600px">Spring sale banner</div>', { viewport: 'mobile', css: 'body{overflow-x:hidden}' });
+    assert.deepEqual(onBody.map((i) => [i.selector, i.severity, i.evidence.maskedBy, i.evidence.maskValue]), [['#wide', 'error', 'body', 'hidden']]);
+    assert.match(onBody[0].message, /`body \{ overflow-x: hidden \}` only hides the part that is cut off/);
+    const onRoot = await detect(pageOverflow, '<div id="root" style="overflow-x:clip"><main><div id="wide" style="width:600px">Spring sale banner</div><p style="height:900px">rest of the app</p></main></div>', { viewport: 'mobile' });
+    assert.deepEqual(onRoot.map((i) => [i.selector, i.evidence.maskedBy]), [['#wide', '#root']]);
+  });
+
+  test('a mask stays quiet on decoration, off-canvas panels, carousels and empty boxes', async () => {
+    const body = `
+      <div aria-hidden="true" style="width:700px;height:40px">decorative backdrop text</div>
+      <nav style="position:absolute;top:0;left:100%;width:280px">Off-canvas menu <a href="#">Home</a></nav>
+      <div style="display:flex;transform:translateX(-100px)"><div style="flex:0 0 300px">Slide one</div><div style="flex:0 0 300px">Slide two</div></div>
+      <div style="width:600px;height:80px;background:linear-gradient(90deg,#fde68a,#fca5a5)"></div>`;
+    assert.deepEqual(await detect(pageOverflow, body, { viewport: 'mobile', css: 'html{overflow-x:hidden}' }), []);
   });
 });
 

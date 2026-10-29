@@ -3,9 +3,11 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { annotate } from './annotate.js';
+import { baselineTargets, comparable, compareCell, findBaseline, issueSelectors, stateKey, summarize } from './compare.js';
 import { renderContactSheet } from './contact-sheet.js';
 import { CELL_DETECTORS, CROSS_DETECTORS } from './detectors/index.js';
 import { installMantisLib } from './inpage/lib.js';
+import { collectState } from './inpage/state.js';
 import { UsageError, formatDarkStrategy, routeSlug } from './options.js';
 import {
   applyDarkStrategy,
@@ -21,6 +23,7 @@ import {
   waitForQuiet,
 } from './page.js';
 import { IssueRegistry, buildReport, renderMarkdown } from './report.js';
+import { projectInfo } from './project.js';
 import { VERSION, deferred, firstLine, pool, runIdFor, sha1, uniqueDir } from './util.js';
 
 /** The URL could not be reached at all (exit code 2). */
@@ -85,7 +88,7 @@ async function fullPageShot(page, file) {
   const opts = { path: file, fullPage: true, animations: 'disabled', caret: 'hide', timeout: 60000 };
   if (size.h > MAX_SHOT_HEIGHT) opts.clip = { x: 0, y: 0, width: size.w, height: MAX_SHOT_HEIGHT };
   await page.screenshot(opts);
-  return size.h > MAX_SHOT_HEIGHT;
+  return { clipped: size.h > MAX_SHOT_HEIGHT, width: size.w };
 }
 
 function documentFailure(url, reason, status = null) {
@@ -100,11 +103,14 @@ function documentFailure(url, reason, status = null) {
   };
 }
 
+const probeTargets = (raws) => raws.flatMap((r) => issueSelectors(r.selector, r.evidence).map((s) => ({ s })));
+
 /**
- * Open one cell (route x viewport x scheme x locale), let it settle and run the per-cell detectors.
+ * Open one cell (route x viewport x scheme x locale), let it settle and run the per-cell detectors,
+ * then capture the cell's state (probes of `targets` and of its own issues, plus the inventory).
  * The page is left open: the caller annotates it, takes the screenshot and closes the context.
  */
-async function runCell(browser, opts, cell, baseline, log) {
+async function runCell(browser, opts, cell, baseline, targets, log) {
   const info = {
     id: cell.id,
     key: `${cell.viewport.name}/${cell.scheme}/${cell.locale}`,
@@ -122,7 +128,7 @@ async function runCell(browser, opts, cell, baseline, log) {
     cls: null,
     notes: [],
   };
-  const out = { info, page: null, context: null, raw: [], snapshots: {} };
+  const out = { info, page: null, context: null, raw: [], snapshots: {}, state: null };
   const context = await browser.newContext(contextOptions(cell));
   context.setDefaultTimeout(opts.timeout);
   const page = await context.newPage();
@@ -201,6 +207,12 @@ async function runCell(browser, opts, cell, baseline, log) {
           info.notes.push(`detector ${d.name} failed: ${firstLine(err.message)}`);
         }
       }
+      try {
+        out.state = await page.evaluate(collectState, { targets: [...probeTargets(out.raw), ...targets] });
+      } catch (err) {
+        if (page.isClosed() || /Execution context was destroyed|Target .*closed/i.test(err.message)) throw err;
+        info.notes.push(`state capture failed: ${firstLine(err.message)}`);
+      }
       return out;
     } catch (err) {
       // Typically the page navigated by itself (client-side redirect) while being analysed.
@@ -209,6 +221,7 @@ async function runCell(browser, opts, cell, baseline, log) {
       info.notes.push(`analysis aborted: ${firstLine(err.message)}${/Execution context was destroyed/i.test(err.message) ? ' (the page navigated away, e.g. a client-side redirect)' : ''}`);
       out.raw = [];
       out.snapshots = {};
+      out.state = null;
       return out;
     }
   } finally {
@@ -224,6 +237,7 @@ async function runCell(browser, opts, cell, baseline, log) {
  */
 export async function look(opts, { log = () => {} } = {}) {
   const startedAt = new Date();
+  const base = await findBaseline(opts);
   const browser = await launchBrowser();
   try {
     if (opts.ignore && opts.ignore.length) {
@@ -272,6 +286,8 @@ export async function look(opts, { log = () => {} } = {}) {
     const registry = new IssueRegistry();
     const cellInfos = new Map();
     const noEffect = new Map(); // route -> Set of "viewport/locale" where dark had no effect
+    const state = { tool: 'mantis', version: VERSION, runId, cells: {} };
+    const compared = new Set();
     const total = groups.length * opts.schemes.length;
     let done = 0;
 
@@ -288,7 +304,8 @@ export async function look(opts, { log = () => {} } = {}) {
             locale: g.locale,
             localeIndex: g.localeIndex,
           };
-          return runCell(browser, opts, cell, baselines.get(`${g.route}|${g.viewport.name}|${scheme}`), log);
+          const targets = base ? baselineTargets(base, g.route, `${g.viewport.name}/${scheme}/${g.locale}`) : [];
+          return runCell(browser, opts, cell, baselines.get(`${g.route}|${g.viewport.name}|${scheme}`), targets, log);
         }));
 
         const light = results.find((r) => r.info.scheme === 'light' && r.info.status === 'ok');
@@ -307,7 +324,11 @@ export async function look(opts, { log = () => {} } = {}) {
                 if (!noEffect.has(g.route)) noEffect.set(g.route, { bg: cmp.lightBg, where: new Set() });
                 noEffect.get(g.route).where.add(`${g.viewport.name}/${g.locale}`);
               }
-              dark.raw.push(...(await d.resolve(dark.page, cmp.findings)));
+              const found = await d.resolve(dark.page, cmp.findings);
+              dark.raw.push(...found);
+              if (dark.state && found.length) {
+                Object.assign(dark.state.probes, (await dark.page.evaluate(collectState, { targets: probeTargets(found), inventory: false })).probes);
+              }
             } catch (err) {
               dark.info.notes.push(`detector ${d.name} failed: ${firstLine(err.message)}`);
             }
@@ -315,6 +336,18 @@ export async function look(opts, { log = () => {} } = {}) {
         }
       } finally {
         if (gi > 0) await turns[gi - 1].promise;
+        for (const r of results) {
+          if (!r.state) continue;
+          const key = stateKey(g.route, r.info.key);
+          state.cells[key] = r.state;
+          if (!base || !comparable(base, r.info)) continue;
+          try {
+            r.raw.push(...compareCell({ route: g.route, cell: r.info.key, raw: r.raw, after: r.state, base }));
+            compared.add(key);
+          } catch (err) {
+            r.info.notes.push(`comparison with the baseline failed: ${firstLine(err.message)}`);
+          }
+        }
         // Register in a fixed order so issue numbers do not depend on timing.
         for (const r of results) {
           const shot = `shots/${r.info.id}.png`;
@@ -340,9 +373,10 @@ export async function look(opts, { log = () => {} } = {}) {
           if (r.page && !r.page.isClosed() && r.info.httpStatus !== null) {
             await r.page.evaluate(() => window.scrollTo({ left: 0, top: 0, behavior: 'instant' }));
             if (r.items.length) await annotate(r.page, r.items);
-            const clipped = await fullPageShot(r.page, file);
+            const shot = await fullPageShot(r.page, file);
             r.info.screenshot = `shots/${r.info.id}.png`;
-            if (clipped) r.info.notes.push(`screenshot truncated at ${MAX_SHOT_HEIGHT}px`);
+            r.info.shotWidth = shot.width;
+            if (shot.clipped) r.info.notes.push(`screenshot truncated at ${MAX_SHOT_HEIGHT}px`);
           }
         } catch (err) {
           r.info.notes.push(`screenshot failed: ${firstLine(err.message)}`);
@@ -388,6 +422,11 @@ export async function look(opts, { log = () => {} } = {}) {
     for (const c of cells) {
       for (const n of c.notes) notes.push(`\`${c.route}\` ${c.key}: ${n}`);
     }
+    let baseline = null;
+    if (base) {
+      baseline = { ...summarize(base, registry, compared), dir: path.relative(outDir, base.dir) || base.dir };
+      if (!compared.size) notes.push(`Baseline run ${base.report.runId} has no cell in common with this run (same route, viewport size, scheme and locale), so nothing was compared.`);
+    }
 
     const report = buildReport({
       version: VERSION,
@@ -398,8 +437,11 @@ export async function look(opts, { log = () => {} } = {}) {
       cells,
       issues: registry.issues,
       notes,
+      baseline,
+      project: projectInfo(),
     });
     await writeFile(path.join(runDir, 'report.json'), JSON.stringify(report, null, 2) + '\n');
+    await writeFile(path.join(runDir, 'state.json'), JSON.stringify(state) + '\n');
     await writeFile(path.join(runDir, 'report.md'), renderMarkdown(report));
     try {
       await renderContactSheet(browser, report, runDir);

@@ -48,7 +48,9 @@ If `mantis` isn't installed, run `npx -y @vulinh1704/mantis look …` instead.
 ## 3. Read the evidence, then look at it
 
 1. Read `.mantis/latest/report.md`: issues grouped by type, with the selector, the
-   screens where each appears, and the screenshot file.
+   screens where each appears, and the screenshot file. When an earlier run of the
+   same URL exists, the report also compares with it: what was fixed, what is new,
+   and any `cover-up` (an issue hidden instead of fixed).
 2. Open the screenshots of the worst screens in `.mantis/latest/shots/`. Errors
    are boxed in red and warnings in amber, each with its issue number. Look at the
    image before deciding; a selector alone can mislead.

@@ -1,4 +1,5 @@
 import { ISSUE_TYPES } from './detectors/index.js';
+import { sha1 } from './util.js';
 
 /**
  * @typedef {object} RawIssue
@@ -15,6 +16,7 @@ import { ISSUE_TYPES } from './detectors/index.js';
 /**
  * @typedef {object} Issue
  * @property {number} id
+ * @property {string} fingerprint  Stable across runs: the same issue in a later run has the same fingerprint.
  * @property {string} type
  * @property {'error'|'warn'} severity
  * @property {string} route
@@ -42,6 +44,11 @@ export class IssueRegistry {
     return [raw.type, route, raw.selector ?? '', raw.key ?? ''].join('\u0000');
   }
 
+  /** Short hash of keyOf(), stored in report.json so a later run can find the same issue. */
+  static fingerprint(route, raw) {
+    return sha1(IssueRegistry.keyOf(route, raw)).slice(0, 12);
+  }
+
   /**
    * @param {string} route
    * @param {string} cell  "viewport/scheme/locale"
@@ -55,6 +62,7 @@ export class IssueRegistry {
     if (!issue) {
       issue = {
         id: this.issues.length + 1,
+        fingerprint: IssueRegistry.fingerprint(route, raw),
         type: raw.type,
         severity: raw.severity,
         route,
@@ -172,8 +180,10 @@ const typeRank = (t) => {
  * @param {object[]} p.cells
  * @param {Issue[]} p.issues
  * @param {string[]} p.notes
+ * @param {object|null} [p.baseline]  comparison with an earlier run (compare.js summarize)
+ * @param {object|null} [p.project]  name, logo, brand color and repo for the sheets (project.js)
  */
-export function buildReport({ version, runId, startedAt, finishedAt, options, cells, issues, notes }) {
+export function buildReport({ version, runId, startedAt, finishedAt, options, cells, issues, notes, baseline = null, project = null }) {
   const routeOrder = options.routes;
   const cellByKey = new Map(cells.map((c) => [`${c.route}|${c.key}`, c]));
   for (const c of cells) {
@@ -212,6 +222,7 @@ export function buildReport({ version, runId, startedAt, finishedAt, options, ce
     startedAt: startedAt.toISOString(),
     durationMs: finishedAt - startedAt,
     url: options.url,
+    project,
     matrix: {
       routes: routeOrder,
       viewports: options.viewports.map((v) => ({ name: v.name, width: v.width, height: v.height })),
@@ -230,6 +241,7 @@ export function buildReport({ version, runId, startedAt, finishedAt, options, ce
       // 2 = Mantis could not analyse some cells (results incomplete), 1 = error issues found.
       exitCode: crashed > 0 ? 2 : errors > 0 ? 1 : 0,
     },
+    baseline,
     cells,
     issues: sortedIssues,
     notes,
@@ -280,6 +292,20 @@ export function renderMarkdown(report, { maxPerType = 30 } = {}) {
   }
   lines.push('');
   lines.push('E = errors, W = warnings, n/l = not localized (same text as the first locale). Each issue is numbered on the screenshots in `shots/`; cells read `viewport/scheme/locale` (`*` = all).', '');
+
+  const b = report.baseline;
+  if (b) {
+    lines.push(`## Compared with run ${b.runId}`, '');
+    lines.push(`**${b.fixed.length} fixed · ${b.new.length} new · ${b.coverUps} cover-up${b.coverUps === 1 ? '' : 's'} · ${b.lost} lost** in ${b.cellsCompared} cells compared`, '');
+    if (b.coverUps) lines.push('A cover-up means an issue disappeared because its element was hidden, removed, shrunk or cut off, not fixed. Undo those changes and fix the cause.', '');
+    for (const f of b.fixed.slice(0, maxPerType)) {
+      const routeText = m.routes.length > 1 ? ` · route \`${f.route}\`` : '';
+      lines.push(`- fixed: was #${f.id} ${f.type}${f.selector ? ` \`${f.selector}\`` : ''} · ${compressCells(f.cells, matrix)}${routeText}`);
+    }
+    if (b.fixed.length > maxPerType) lines.push(`- … ${b.fixed.length - maxPerType} more in report.json`);
+    if (b.new.length) lines.push(`- new: ${b.new.map((id) => `#${id}`).join(', ')}`);
+    if (b.fixed.length || b.new.length) lines.push('');
+  }
 
   if (!report.issues.length) {
     lines.push('No issues found.', '');

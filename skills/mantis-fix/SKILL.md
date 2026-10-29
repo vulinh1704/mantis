@@ -17,18 +17,35 @@ the token once.
 ## Loop
 
 1. Start from `.mantis/latest/report.md`. No report yet: run the **mantis** skill
-   first.
+   first. Note the run directory: it is the baseline of your fix.
 2. Group issues by root cause (the same hard-coded color, the same fixed width, the
    same flex container) and fix the group.
-3. Run the same `mantis look` command again, with the same routes and options.
-4. Repeat until there are 0 errors. Stop after 3 rounds and report what is left and
+3. Run the same `mantis look` command again, with the same routes and options. It
+   compares itself with the previous run of the same URL and prints
+   `N fixed · N new · N cover-ups · N lost`.
+4. Any `cover-up` error means an issue went away because its element was hidden,
+   removed, shrunk, cut off or emptied, not fixed. Undo that change and fix the
+   cause. Every `lost` warning is a control or heading that disappeared: restore
+   it unless removing it was the point of the task.
+5. Repeat until there are 0 errors. Stop after 3 rounds and report what is left and
    why.
-5. Run the project's own tests, type check and linter.
-6. For a pull request, make before/after evidence with **mantis-proof**.
+6. Prove the fix is what made the difference (revert-proof), when the dev server
+   reloads from disk:
+   - `git stash push -- <the files you changed>`, then `mantis look` again: the
+     issues you fixed must come back (they show up as new);
+   - `git stash pop`, then `mantis look` again: they are fixed, with 0 cover-ups.
+   If they do not come back without your change, your change did not fix them.
+7. Run the project's own tests, type check and linter.
+8. For a pull request, make before/after evidence with **mantis-proof**, using the
+   baseline run from step 1 as `--before`.
+
+Never pass `--baseline none` to make a cover-up go away. It is for starting over
+after an intended redesign, and you say so in your report.
 
 ## Never "fix" by hiding
 
-These make the report quieter and the product worse. Don't:
+These make the report quieter and the product worse, and Mantis reports most of
+them as cover-ups. Don't:
 
 - put `overflow-x: hidden` on `html`, `body` or the app root to hide horizontal
   overflow (it hides content and breaks `position: sticky`);
@@ -91,8 +108,10 @@ a fallback.
 
 ## Report back
 
-Cover four things:
+Cover five things:
 - what was wrong, as root causes rather than a list of thirty selectors;
 - what you changed;
 - the error count before → after;
+- the comparison line from the last run (`N fixed · 0 new · 0 cover-ups · 0 lost`)
+  and whether the revert-proof check was done;
 - anything left, with the reason.

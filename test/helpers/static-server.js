@@ -2,12 +2,14 @@
  * Tiny static file server for the fixtures (node:http, no dependencies).
  * - `/` serves index.html, `/settings` serves settings.html (clean URLs);
  * - missing files answer 404 with a small HTML page;
- * - responses are never cached, so every Mantis cell sees a cold load.
+ * - responses are never cached, so every Mantis cell sees a cold load;
+ * - setRoot() swaps the served directory and setInject() adds a <style> to every HTML page, so a
+ *   test can "edit" the app behind the same URL the way an agent edits a dev server.
  *
  * Usage as a script: node test/helpers/static-server.js <dir> [port]
  */
 import { createReadStream } from 'node:fs';
-import { stat } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
 import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -55,10 +57,11 @@ async function resolveFile(root, urlPath) {
 /**
  * @param {string} dir  directory to serve
  * @param {{port?: number, host?: string}} [opts]
- * @returns {Promise<{url: string, port: number, close: () => Promise<void>}>}
+ * @returns {Promise<{url: string, port: number, close: () => Promise<void>, setRoot: (dir: string) => void, setInject: (css: string) => void}>}
  */
 export async function startStaticServer(dir, { port = 0, host = '127.0.0.1' } = {}) {
-  const root = path.resolve(dir);
+  let root = path.resolve(dir);
+  let inject = '';
   const server = http.createServer(async (req, res) => {
     const file = await resolveFile(root, req.url || '/');
     if (!file) {
@@ -72,6 +75,10 @@ export async function startStaticServer(dir, { port = 0, host = '127.0.0.1' } = 
     });
     if (req.method === 'HEAD') {
       res.end();
+      return;
+    }
+    if (inject && file.endsWith('.html')) {
+      res.end((await readFile(file, 'utf8')).replace('</head>', `<style data-injected>${inject}</style></head>`));
       return;
     }
     createReadStream(file).pipe(res);
@@ -88,6 +95,12 @@ export async function startStaticServer(dir, { port = 0, host = '127.0.0.1' } = 
       server.closeAllConnections?.();
       server.close(() => resolve());
     }),
+    setRoot: (next) => {
+      root = path.resolve(next);
+    },
+    setInject: (css) => {
+      inject = css;
+    },
   };
 }
 
