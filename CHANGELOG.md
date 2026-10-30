@@ -2,6 +2,10 @@
 
 Full notes, with images, are on the [releases page](https://github.com/vulinh1704/mantis/releases).
 
+## Unreleased
+
+- `mantis mcp` serves Mantis to any MCP client over stdio, with four tools that take the CLI's options: `mantis_look`, `mantis_perf`, `mantis_learn` and `mantis_proof`. Each returns its report as text and its sheet as an image, and reports progress while it runs. `claude mcp add mantis -- npx -y @vulinh1704/mantis mcp`. No new dependencies. `server.json` describes the server for the MCP Registry (`io.github.vulinh1704/mantis`).
+
 ## 0.6.0 (2026-10-30)
 
 - `mantis perf <url>` (first part): every route is loaded N times cold (`--runs`, default 5) in Chromium, throttled like a mid-range phone on slow 4G (`--profile mobile`, the default) or unthrottled (`--profile desktop`). It reports the median and spread of LCP, FCP, TBT, CLS, TTFB, load time, bytes and requests, and explains them: the LCP element, the slowest requests with the server's real wait and the function that made each one, the functions the main thread spent its time in (app and third-party), the long animation frames, and the code that never ran. A dev server is called out. Output: `.mantis/perf/latest/perf.md` and `perf.json`.

@@ -2,6 +2,7 @@ import path from 'node:path';
 import { learn } from './learn.js';
 import { BrowserError, UnreachableError, look } from './look.js';
 import { UsageError, parseLearnArgs, parseLookArgs, parsePerfArgs, parseProofArgs } from './options.js';
+import { serveMcp } from './mcp.js';
 import { savingLabel } from './perf/findings.js';
 import { fmtKb, fmtMs, perf } from './perf/index.js';
 import { styleCounts } from './style.js';
@@ -14,6 +15,7 @@ Usage
   mantis look <url> [options]
   mantis learn <url> [options]
   mantis perf <url> [options]
+  mantis mcp
   mantis proof --before <runDir> --after <runDir> [--out <file.png>]
                [--video --before-url <url> --after-url <url> [--viewport mobile]
                 [--dark-strategy media|class:dark|attr:data-theme=dark]
@@ -104,6 +106,11 @@ not what users get.
                                controls are gone is a cover-up error
   --json                       print perf.json to stdout
 
+mcp: serve Mantis to an MCP client over stdio, with the tools mantis_look,
+mantis_perf, mantis_learn and mantis_proof (the commands above, same options).
+Each returns its report as text and its sheet as an image. For example:
+  claude mcp add mantis -- npx -y @vulinh1704/mantis@${VERSION} mcp
+
 Exit codes: 0 no errors · 1 error-level issues found · 2 crash, unreachable URL or bad usage
 `;
 
@@ -130,6 +137,17 @@ export async function main(argv = process.argv.slice(2), { stdout = process.stdo
     return 0;
   }
   try {
+    if (cmd === 'mcp') {
+      if (rest.includes('-h') || rest.includes('--help')) {
+        out(HELP);
+        return 0;
+      }
+      if (rest.length) throw new UsageError(`mcp takes no arguments (got "${rest[0]}")`);
+      // stdout carries the protocol: anything else printed there would corrupt it
+      console.log = console.error;
+      await serveMcp();
+      return 0;
+    }
     if (cmd === 'look') {
       if (rest.includes('-h') || rest.includes('--help')) {
         out(HELP);
@@ -219,7 +237,7 @@ export async function main(argv = process.argv.slice(2), { stdout = process.stdo
       }
       return res.exitCode;
     }
-    throw new UsageError(`unknown command "${cmd}" (use look, learn, perf or proof)`);
+    throw new UsageError(`unknown command "${cmd}" (use look, learn, perf, proof or mcp)`);
   } catch (e) {
     if (e instanceof UsageError) {
       err(`mantis: ${e.message}`);
