@@ -93,7 +93,7 @@ describe('parseLearnArgs', () => {
     assert.deepEqual(o.routes, ['/', '/settings']);
     assert.deepEqual(o.schemes, ['light']);
     assert.equal(o.out, '.mantis');
-    for (const flag of ['--locales', '--baseline', '--style', '--json']) {
+    for (const flag of ['--locales', '--locale-strategy', '--baseline', '--style', '--json']) {
       assert.throws(() => parseLearnArgs(['http://localhost:3000', flag, 'x']), /is a look option/);
     }
   });

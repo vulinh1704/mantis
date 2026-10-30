@@ -369,7 +369,7 @@ function parseStyleChoice(value) {
  */
 export function parseLearnArgs(argv) {
   for (const a of argv) {
-    const m = /^--(locales|baseline|style|json)(=|$)/.exec(a);
+    const m = /^--(locales|locale-strategy|baseline|style|json)(=|$)/.exec(a);
     if (m) throw new UsageError(`--${m[1]} is a look option; learn measures the first locale of every route`);
   }
   const o = parseLookArgs(argv);

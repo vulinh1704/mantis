@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Signal</title>
+<!-- Stands in for a server-rendered app that hydrates: when the text it finds differs from what
+     it rendered on the server, it logs React's hydration mismatch error, as React 18 does. Plus
+     content the pseudo-locale must leave alone: an SVG <style>, an icon-font ligature, and a
+     translate="yes" island inside translate="no". -->
+<style>
+  body { margin: 0; padding: 24px; font: 16px/1.5 "DejaVu Sans Mono", Consolas, monospace; color: #111827; background: #fff; }
+</style>
+</head>
+<body>
+  <h1 id="greeting">Welcome back</h1>
+  <svg id="logo" width="24" height="24" viewBox="0 0 24 24"><style>.mark { fill: rgb(29, 78, 216); }</style><rect class="mark" width="24" height="24"/></svg>
+  <span id="icon" class="material-icons">menu</span>
+  <p translate="no">Signal <span id="tagline" translate="yes">Weekly notes</span></p>
+  <script>
+    addEventListener('load', () => {
+      if (document.getElementById('greeting').textContent !== 'Welcome back') {
+        console.error('Warning: Text content does not match server-rendered HTML.');
+      }
+    });
+  </script>
+</body>
+</html>

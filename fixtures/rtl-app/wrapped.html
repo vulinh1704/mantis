@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pricing</title>
+<!-- Like many single-page apps: index.html stays lang="en" with no dir, and the app sets
+     dir="rtl" on its own root element for Arabic. That is correct and must not be flagged. -->
+<style>
+  body { margin: 0; padding: 24px; font: 16px/1.5 system-ui, "DejaVu Sans", sans-serif; color: #111827; background: #fff; }
+  h1 { margin: 0 0 8px; font-size: 28px; }
+  #plans { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 16px; }
+  .plan { flex: 0 0 140px; padding: 16px; border: 1px solid #d1d5db; border-radius: 12px; font-weight: 600; }
+</style>
+</head>
+<body>
+  <div id="app">
+    <h1 id="title"></h1>
+    <p id="lead"></p>
+    <div id="plans"></div>
+  </div>
+  <script>window.SET_DIR = false;</script>
+  <script src="/app.js"></script>
+  <script>if (document.documentElement.lang === 'ar') document.getElementById('app').dir = 'rtl';</script>
+</body>
+</html>
