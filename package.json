@@ -21,7 +21,8 @@
   "scripts": {
     "test": "node --test test/*.test.js",
     "serve:buggy": "node test/helpers/static-server.js fixtures/buggy-app 4321",
-    "serve:clean": "node test/helpers/static-server.js fixtures/clean-app 4322"
+    "serve:clean": "node test/helpers/static-server.js fixtures/clean-app 4322",
+    "serve:slow": "node test/helpers/slow-server.js 4330"
   },
   "keywords": [
     "agent",

@@ -1,7 +1,8 @@
 import path from 'node:path';
 import { learn } from './learn.js';
 import { BrowserError, UnreachableError, look } from './look.js';
-import { UsageError, parseLearnArgs, parseLookArgs, parseProofArgs } from './options.js';
+import { UsageError, parseLearnArgs, parseLookArgs, parsePerfArgs, parseProofArgs } from './options.js';
+import { fmtKb, fmtMs, perf } from './perf/index.js';
 import { styleCounts } from './style.js';
 import { proof } from './proof.js';
 import { VERSION } from './util.js';
@@ -11,6 +12,7 @@ export const HELP = `mantis ${VERSION} — catches the UI bugs your coding agent
 Usage
   mantis look <url> [options]
   mantis learn <url> [options]
+  mantis perf <url> [options]
   mantis proof --before <runDir> --after <runDir> [--out <file.png>]
                [--video --before-url <url> --after-url <url> [--viewport mobile]
                 [--dark-strategy media|class:dark|attr:data-theme=dark]
@@ -74,6 +76,22 @@ plus a close-up of one fixed finding at the same coordinates (<out>-zoom.png).
 stacks them into one MP4 next to --out (default .mantis/proof.mp4) with ffmpeg,
 between a title card and a closing receipt when the two runs are given too;
 without ffmpeg the two raw .webm recordings are kept instead.
+
+perf: load every route N times cold in Chromium, throttled like a mid-range phone on
+slow 4G (or unthrottled with --profile desktop), and report the median and spread
+of LCP, FCP, TBT, CLS, TTFB, load, bytes and requests, with the LCP element, the
+slowest requests and the code that made them, the long animation frames and the
+scripts that ran in them, and the code that never ran. Writes
+<out>/perf/runs/<timestamp>/{perf.md,perf.json} plus a copy in <out>/perf/latest.
+Measure a production build: a dev server's numbers are not what users get.
+
+  --routes /,/settings         routes to measure (default: the URL's own path)
+  --runs <n>                   cold visits per route, 1-15 (default 5)
+  --profile mobile|desktop     default mobile
+  --out .mantis                output directory
+  --timeout <ms>               navigation timeout (default 60000)
+  --storage-state <file>       start every visit with this Playwright storage state
+  --json                       print perf.json to stdout
 
 Exit codes: 0 no errors · 1 error-level issues found · 2 crash, unreachable URL or bad usage
 `;
@@ -156,7 +174,32 @@ export async function main(argv = process.argv.slice(2), { stdout = process.stdo
       if (res.video) out(`video   ${rel(res.video)}`);
       return 0;
     }
-    throw new UsageError(`unknown command "${cmd}" (use look, learn or proof)`);
+    if (cmd === 'perf') {
+      if (rest.includes('-h') || rest.includes('--help')) {
+        out(HELP);
+        return 0;
+      }
+      const opts = parsePerfArgs(rest);
+      err(`mantis perf ${opts.url} · routes ${opts.routes.join(',')} · ${opts.profile} · ${opts.runs} run${opts.runs === 1 ? '' : 's'}`);
+      const res = await perf(opts, { log: err });
+      if (opts.json) {
+        out(JSON.stringify(res.report, null, 2));
+      } else {
+        out('');
+        for (const r of res.report.routes) {
+          if (!r.metrics) {
+            out(`${r.route}  failed`);
+            continue;
+          }
+          const m = r.metrics;
+          out(`${r.route}  LCP ${fmtMs(m.lcp?.median)} · FCP ${fmtMs(m.fcp?.median)} · TBT ${fmtMs(m.tbt?.median)} · CLS ${m.cls?.median ?? '–'} · ${fmtKb(m.bytes?.median)} in ${m.requests?.median ?? '–'} requests${r.devServer ? '  (dev server)' : ''}`);
+        }
+        out(`  report  ${rel(path.join(res.latestDir, 'perf.md'))}`);
+        out(`  run     ${rel(res.runDir)}`);
+      }
+      return res.exitCode;
+    }
+    throw new UsageError(`unknown command "${cmd}" (use look, learn, perf or proof)`);
   } catch (e) {
     if (e instanceof UsageError) {
       err(`mantis: ${e.message}`);
