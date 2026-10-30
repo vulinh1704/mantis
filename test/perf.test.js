@@ -13,7 +13,7 @@ import path from 'node:path';
 import { after, before, describe, test } from 'node:test';
 import { UsageError, parsePerfArgs } from '../src/options.js';
 import { BUCKETS, bucketOf, findRouteIssues, impactOf, rankFindings, savingLabel } from '../src/perf/findings.js';
-import { aggregate, attachServerWait, median, rating, renderPerfMarkdown, representative } from '../src/perf/index.js';
+import { aggregate, attachServerWait, lcpVisits, median, rating, renderPerfMarkdown, representative } from '../src/perf/index.js';
 import { PERF_PROFILES, clsOf, hotFunctions, tbtOf, unusedJsBytes } from '../src/perf/measure.js';
 import { siteOf } from '../src/perf/metrics.js';
 import { apiPattern, appApis } from '../src/perf/network.js';
@@ -75,6 +75,19 @@ describe('perf arithmetic', () => {
     assert.deepEqual(agg.lcp, { median: 2100, min: 1800, max: 3000, values: [1800, 3000, 2100], rating: 'good' });
     assert.equal(agg.ttfb, undefined, 'a metric no visit has is left out');
     assert.equal(representative(visits, agg), 2);
+  });
+
+  test('a visit where Chrome missed a larger painted image is left out of LCP, and the report says so', () => {
+    const v = (lcp, missed) => ({ metrics: { lcp }, ...(missed ? { lcpMissed: { selector: 'img.hero', loadedAt: 2324, area: 900000 } } : {}) });
+    const ok = [v(2350), v(2360), v(2340)];
+    assert.deepEqual(lcpVisits(ok), { use: ok, note: null });
+    const some = [v(2350), v(340, true), v(2360)];
+    const t = lcpVisits(some);
+    assert.deepEqual(t.use, [some[0], some[2]]);
+    assert.match(t.note, /no LCP entry for `img\.hero` in 1 of 3 visits.*left out of LCP/);
+    const all = [v(340, true)];
+    assert.equal(lcpVisits(all).use, all);
+    assert.match(lcpVisits(all).note, /loaded at 2\.3 s.*LCP may be too low here/);
   });
 
   test('server waits are matched by method, URL and order', () => {

@@ -159,7 +159,9 @@ describe('mantis perf: fixed at the root vs emptied (end-to-end)', { concurrency
     assert.equal(b.coverUps.length, 1);
     const c = b.coverUps[0];
     assert.equal(c.route, '/');
-    assert.ok(c.reasons.some((x) => /the LCP element was an image \(`img\.hero`/.test(x)), JSON.stringify(c.reasons));
+    // the hero is gone: as the LCP element (when Chrome reported it as such) and from the first screen
+    assert.ok(c.reasons.some((x) => /image on the first screen is gone/.test(x)), JSON.stringify(c.reasons));
+    assert.ok(runs.fixed.report.routes[0].visit.lcpElement?.selector !== 'img.hero' || c.reasons.some((x) => /the LCP element was an image \(`img\.hero`/.test(x)), JSON.stringify(c.reasons));
     assert.ok(c.reasons.some((x) => /visible text dropped/.test(x)), JSON.stringify(c.reasons));
     assert.equal(r.code, 1);
     assert.match(r.stdout, /COVER-UP \/: faster, or just emptier\?/);
