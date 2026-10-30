@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Orders · Slowpoke</title>
+<!-- slow-app with every problem in PLANTED.json fixed at the root; the content is the same. -->
+<style>
+  body { margin: 0; font: 16px/1.5 system-ui, "DejaVu Sans", sans-serif; color: #111827; background: #fff; }
+  .top { display: flex; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid #e5e7eb; }
+  .promo { min-height: 24px; padding: 12px 16px; background: #fef3c7; font-weight: 600; }
+  main { padding: 0 16px 16px; }
+  .hero { display: block; width: calc(100% + 32px); height: auto; margin: 0 -16px; }
+  #orders { min-height: 7.5em; padding-left: 20px; }
+  #chat { margin-top: 12px; }
+</style>
+<script>window.FLAGS = { promo: true, chart: true }; window.CHAT_SRC = '{{VENDOR}}/widget.js';</script>
+<script defer src="/app-fixed.js"></script>
+</head>
+<body>
+  <div class="promo" id="promo"></div>
+  <header class="top"><strong>Slowpoke</strong> <nav><a href="/">Orders</a> <a href="/fast">Help</a></nav></header>
+  <main>
+    <img class="hero" src="/hero-800.png" srcset="/hero-800.png 800w, /hero-1200.png 1200w" sizes="100vw" width="1200" height="750" fetchpriority="high" alt="Our warehouse at dawn">
+    <h1>Your orders</h1>
+    <p id="greeting">Loading…</p>
+    <ul id="orders"></ul>
+    <canvas id="chart" width="320" height="120" aria-label="Orders per day"></canvas>
+    <button id="chat" type="button">Chat with us</button>
+  </main>
+</body>
+</html>

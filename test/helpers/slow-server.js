@@ -12,7 +12,7 @@
  *   blocks the main thread) and a /collect beacon (after 400 ms). {{VENDOR}} in HTML is its origin;
  * - nothing is cached.
  *
- * Usage as a script: node test/helpers/slow-server.js [port]
+ * Usage as a script: node test/helpers/slow-server.js [port] [fixed|emptied]
  */
 import { readFile } from 'node:fs/promises';
 import http from 'node:http';
@@ -67,10 +67,15 @@ function bigScript() {
   return `// Every feature the app has, shipped to every page.\n${fns.join('\n')}\nwindow.FEATURE_CHECK = feature0([1, 2, 3]);\n`;
 }
 
+const config = () => ({ currency: 'EUR', points: 10000 });
+const user = () => ({ id: 7, name: 'Ada' });
+const orders = () => [1, 2, 3, 4, 5].map((n) => ({ id: 100 + n, product: n, status: n % 2 ? 'shipped' : 'packing' }));
 const API = {
-  '/api/config': [200, () => ({ currency: 'EUR', points: 10000 })],
-  '/api/user': [300, () => ({ id: 7, name: 'Ada' })],
-  '/api/orders': [500, () => [1, 2, 3, 4, 5].map((n) => ({ id: 100 + n, product: n, status: n % 2 ? 'shipped' : 'packing' }))],
+  '/api/config': [200, config],
+  '/api/user': [300, user],
+  '/api/orders': [500, orders],
+  // fixed.html: everything the page shows in one call, from a server that no longer waits on itself
+  '/api/page': [150, () => ({ config: config(), user: user(), orders: orders().map((o) => ({ ...o, product: { id: o.product, name: `Product ${o.product}` } })) })],
 };
 
 function send(res, status, type, body) {
@@ -90,12 +95,17 @@ async function listen(handler, port, host) {
 }
 
 /**
+ * setVariant('fixed') serves fixed.html at `/` (every problem fixed at the root, same content),
+ * setVariant('emptied') serves emptied.html (made "faster" by removing the hero, the data and the
+ * chart), setVariant(null) the original.
  * @param {{port?: number, host?: string}} [opts]
- * @returns {Promise<{url: string, vendorUrl: string, close: () => Promise<void>}>}
+ * @returns {Promise<{url: string, vendorUrl: string, close: () => Promise<void>, setVariant: (name: 'fixed'|'emptied'|null) => void}>}
  */
 export async function startSlowServer({ port = 0, host = '127.0.0.1' } = {}) {
   const hero = photoPng();
+  const heroSmall = photoPng(800, 500);
   const big = bigScript();
+  let variant = null;
   const vendor = await listen(async (req, res) => {
     const { pathname } = new URL(req.url, 'http://x');
     if (pathname === '/widget.js') {
@@ -132,10 +142,12 @@ export async function startSlowServer({ port = 0, host = '127.0.0.1' } = {}) {
       await sleep(2000);
       return send(res, 200, 'image/png', hero);
     }
+    if (pathname === '/hero-1200.png') return send(res, 200, 'image/png', hero);
+    if (pathname === '/hero-800.png') return send(res, 200, 'image/png', heroSmall);
     if (pathname === '/big.js') return send(res, 200, TYPES['.js'], big);
     if (pathname === '/@vite/client') return send(res, 200, TYPES['.js'], '// stands in for the Vite client\n');
     if (pathname === '/flags.js') await sleep(300);
-    const file = pathname === '/' ? 'index.html' : /^\/[\w-]+$/.test(pathname) ? `${pathname.slice(1)}.html` : pathname.slice(1);
+    const file = pathname === '/' ? `${variant ?? 'index'}.html` : /^\/[\w-]+$/.test(pathname) ? `${pathname.slice(1)}.html` : pathname.slice(1);
     if (!/^[\w.-]+$/.test(file)) return send(res, 404, TYPES['.html'], '<!doctype html><title>404</title><h1>404</h1>');
     let body;
     try {
@@ -155,10 +167,14 @@ export async function startSlowServer({ port = 0, host = '127.0.0.1' } = {}) {
     close: async () => {
       await Promise.all([close(app), close(vendor)]);
     },
+    setVariant: (name) => {
+      variant = name;
+    },
   };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
   const s = await startSlowServer({ port: Number(process.argv[2] || 4330) });
-  process.stdout.write(`slow-app at ${s.url} (vendor at ${s.vendorUrl})\n`);
+  if (process.argv[3]) s.setVariant(process.argv[3]);
+  process.stdout.write(`slow-app${process.argv[3] ? ` (${process.argv[3]})` : ''} at ${s.url} (vendor at ${s.vendorUrl})\n`);
 }

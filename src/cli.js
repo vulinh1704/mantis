@@ -87,7 +87,7 @@ impact and fix risk (do first, plan, nice to have, your call), each with its
 culprit (selector, URL or file:line and function), the estimated saving and the
 framework's own way to fix it. Writes <out>/perf/runs/<timestamp>/{perf.md,
 perf.json} plus a copy in <out>/perf/latest. Exit code 1 when there is something
-to do first or to plan. Measure a production build: a dev server's numbers are
+to do first or to plan, or a cover-up. Measure a production build: a dev server's numbers are
 not what users get.
 
   --routes /,/settings         routes to measure (default: the URL's own path)
@@ -96,6 +96,12 @@ not what users get.
   --out .mantis                output directory
   --timeout <ms>               navigation timeout (default 60000)
   --storage-state <file>       start every visit with this Playwright storage state
+  --baseline auto|none|<dir>   perf run to compare with (default auto: the previous
+                               perf run of the same URL, profile and storage state).
+                               A metric counts as changed only beyond both runs'
+                               spread; a route that got faster because its LCP
+                               image, text, first-screen images, headings or
+                               controls are gone is a cover-up error
   --json                       print perf.json to stdout
 
 Exit codes: 0 no errors · 1 error-level issues found · 2 crash, unreachable URL or bad usage
@@ -202,6 +208,11 @@ export async function main(argv = process.argv.slice(2), { stdout = process.stdo
         const s = res.report.summary;
         out(`Fixes: ${s['do-first']} do first · ${s.plan} plan · ${s.nice} nice to have · ${s['your-call']} your call`);
         for (const f of res.report.findings.slice(0, 3)) out(`  ${savingLabel(f).padEnd(14)} ${f.title}`);
+        const b = res.report.baseline;
+        if (b) {
+          out(`  vs ${b.runId}: ${b.receipt}`);
+          for (const c of b.coverUps) out(`  COVER-UP ${c.route}: faster, or just emptier? ${c.improved.join(', ')}, but ${c.reasons[0]}`);
+        }
         out(`  report  ${rel(path.join(res.latestDir, 'perf.md'))}`);
         out(`  run     ${rel(res.runDir)}`);
       }
