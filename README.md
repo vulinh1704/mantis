@@ -370,7 +370,7 @@ Or build and serve the app in the job, and point `url` at it (`http://localhost:
 
 ## Install
 
-> Mantis is in early development (v0.6). Expect rough edges, and please [open an issue](https://github.com/vulinh1704/mantis/issues) when it gets something wrong.
+> Mantis is in early development (v0.7). Expect rough edges, and please [open an issue](https://github.com/vulinh1704/mantis/issues) when it gets something wrong.
 
 **Claude Code**
 

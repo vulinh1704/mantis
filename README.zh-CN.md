@@ -120,7 +120,7 @@ vs 2026-10-30T12-32-02: LCP 2.5 s → 36 ms · TBT 121 ms → 0 ms · CLS 0.164 
 
 ## 安装
 
-> Mantis 还处于早期开发阶段（v0.6）。难免有不完善的地方，遇到问题请[提交 issue](https://github.com/vulinh1704/mantis/issues)。
+> Mantis 还处于早期开发阶段（v0.7）。难免有不完善的地方，遇到问题请[提交 issue](https://github.com/vulinh1704/mantis/issues)。
 
 **Claude Code**
 
