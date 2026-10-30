@@ -48,7 +48,7 @@ mantis proof --video --before-url http://localhost:3001 --after-url http://local
 Add `--before <run> --after <run>` to the same command and the video opens with a
 title card and ends with the receipt (errors before → after, cover-ups).
 
-If `mantis` isn't installed, use `npx -y @vulinh1704/mantis@0.7.0 …`. When the
+If `mantis` isn't installed, use `npx -y @vulinh1704/mantis@0.7.1 …`. When the
 pages are behind a login, pass the same `--storage-state <file>` you used for
 `look` to `proof --video`.
 

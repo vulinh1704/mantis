@@ -17,7 +17,7 @@ Measure first, fix the biggest safe thing, measure again. Never make a number
 better by removing what the page shows.
 
 The commands below use `mantis`. If it isn't installed, run
-`npx -y @vulinh1704/mantis@0.7.0 …` with the same arguments.
+`npx -y @vulinh1704/mantis@0.7.1 …` with the same arguments.
 
 ## 1. Measure a production build
 
