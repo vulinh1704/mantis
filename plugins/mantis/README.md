@@ -17,12 +17,13 @@ On Claude Code older than 2.1.275, run `/plugin marketplace add vulinh1704/manti
 | `mantis` | Looks at the running app and reads the report and screenshots before a UI task is called done. |
 | `mantis-fix` | Fixes what Mantis found at the root, then proves the fix: the issues are gone, nothing was hidden, and they come back when the change is reverted. |
 | `mantis-proof` | Makes before/after images and an optional video of a fix. |
+| `mantis-perf` | Measures load speed like a phone on slow 4G, fixes what slows the page down in order of impact and risk (images, blocking files, main-thread code, slow or chained API calls, third parties), and flags a speed-up that only removed content. |
 
 ## What it runs and touches
 
-- **Commands.** The skills tell the agent to run the Mantis CLI, either as `mantis` or as `npx -y @vulinh1704/mantis@0.4.0`. npx downloads that exact version of the CLI and its dependencies (Playwright and axe-core) from npm. Playwright may also download Chromium.
+- **Commands.** The skills tell the agent to run the Mantis CLI, either as `mantis` or as `npx -y @vulinh1704/mantis@0.6.0`. npx downloads that exact version of the CLI and its dependencies (Playwright and axe-core) from npm. Playwright may also download Chromium.
 - **Pages.** The CLI opens only the URLs the agent passes to it, usually the app's local dev server, in headless Chromium.
-- **Writes.** It writes reports and screenshots to `.mantis/` in the project, with a `.gitignore` that keeps them out of git.
+- **Writes.** It writes reports, screenshots and perf filmstrips to `.mantis/` in the project, with a `.gitignore` that keeps them out of git.
 - **Sends.** Nothing. There is no telemetry and no account.
 
 The plugin itself has no hooks and no MCP servers, and it runs nothing on install.

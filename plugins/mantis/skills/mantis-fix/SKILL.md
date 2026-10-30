@@ -16,8 +16,8 @@ Fix the cause, not the symptom. One wrong token can break twenty components; fix
 the token once.
 
 The commands below use `mantis`. If it isn't installed, run
-`npx -y @vulinh1704/mantis@0.4.0 …` with the same arguments
-(`npx -y @vulinh1704/mantis@0.4.0 look http://localhost:3000 --routes /`). Don't
+`npx -y @vulinh1704/mantis@0.6.0 …` with the same arguments
+(`npx -y @vulinh1704/mantis@0.6.0 look http://localhost:3000 --routes /`). Don't
 replace it with a screenshot script of your own: you would lose the before/after
 comparison and the cover-up check.
 
@@ -139,6 +139,12 @@ a fallback.
 - fixed-size skeletons;
 - no banners inserted above content after load;
 - fonts with `font-display: swap` and a metric-matched fallback.
+
+**direction**: a right-to-left language (Arabic, Hebrew, Persian, Urdu) laid out
+left to right. Set `dir="rtl"` on `<html>` for that locale (where the app sets
+`lang`); don't flip individual elements. Then fix what overflows on the left with
+logical CSS properties (`margin-inline-start`, `inset-inline-start`,
+`text-align: start`).
 
 ## Report back
 
