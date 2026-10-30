@@ -2,6 +2,10 @@
 
 Full notes, with images, are on the [releases page](https://github.com/vulinh1704/mantis/releases).
 
+## Unreleased
+
+- `mantis perf <url>` (first part): every route is loaded N times cold (`--runs`, default 5) in Chromium, throttled like a mid-range phone on slow 4G (`--profile mobile`, the default) or unthrottled (`--profile desktop`). It reports the median and spread of LCP, FCP, TBT, CLS, TTFB, load time, bytes and requests, and explains them: the LCP element, the slowest requests with the server's real wait and the function that made each one, the functions the main thread spent its time in (app and third-party), the long animation frames, and the code that never ran. A dev server is called out. Output: `.mantis/perf/latest/perf.md` and `perf.json`.
+
 ## 0.5.1 (2026-10-30)
 
 Fixes from a review of 0.5.0 (#30):
