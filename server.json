@@ -7,13 +7,13 @@
     "url": "https://github.com/vulinh1704/mantis",
     "source": "github"
   },
-  "version": "0.7.0",
+  "version": "0.7.1",
   "packages": [
     {
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "@vulinh1704/mantis",
-      "version": "0.7.0",
+      "version": "0.7.1",
       "transport": { "type": "stdio" },
       "packageArguments": [{ "type": "positional", "value": "mcp" }]
     }

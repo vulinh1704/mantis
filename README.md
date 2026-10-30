@@ -347,7 +347,7 @@ jobs:
     if: github.event.deployment_status.state == 'success'
     runs-on: ubuntu-latest
     steps:
-      - uses: vulinh1704/mantis@v0.7.0
+      - uses: vulinh1704/mantis@v0.7.1
         with:
           url: ${{ github.event.deployment_status.target_url }}
           baseline-url: https://your-app.com
