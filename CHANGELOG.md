@@ -5,6 +5,18 @@ Full notes, with images, are on the [releases page](https://github.com/vulinh170
 ## Unreleased
 
 - `mantis perf <url>` (first part): every route is loaded N times cold (`--runs`, default 5) in Chromium, throttled like a mid-range phone on slow 4G (`--profile mobile`, the default) or unthrottled (`--profile desktop`). It reports the median and spread of LCP, FCP, TBT, CLS, TTFB, load time, bytes and requests, and explains them: the LCP element, the slowest requests with the server's real wait and the function that made each one, the functions the main thread spent its time in (app and third-party), the long animation frames, and the code that never ran. A dev server is called out. Output: `.mantis/perf/latest/perf.md` and `perf.json`.
+- `mantis perf` ranks fixes by impact and fix risk: do first (worth it, low risk), plan, nice to have, your call. Each fix names its culprit (a selector, a URL, or a `file:line` and function), the metric it moves with an estimated saving and how sure that estimate is, and the detected framework's own way to fix it (Next.js, Nuxt, Angular, Vue, React, SvelteKit). Checked:
+  - the LCP image: lazy-loaded, or found late;
+  - images much larger than they are drawn;
+  - files in `<head>` that hold the first paint;
+  - first-party functions that hold the main thread;
+  - code that never runs;
+  - fonts that hide text;
+  - layout shifts, grouped by their cause (an image without a size, an element inserted above, a container filled late);
+  - a slow HTML response;
+  - uncompressed text away from localhost.
+
+  A layout shift saves only what CLS would drop without it, and an image fix saves at most LCP − FCP. Exit code 1 when there is something to do first or to plan.
 
 ## 0.5.1 (2026-10-30)
 

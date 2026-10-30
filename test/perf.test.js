@@ -12,9 +12,12 @@ import os from 'node:os';
 import path from 'node:path';
 import { after, before, describe, test } from 'node:test';
 import { UsageError, parsePerfArgs } from '../src/options.js';
+import { BUCKETS, bucketOf, findRouteIssues, impactOf, rankFindings, savingLabel } from '../src/perf/findings.js';
 import { aggregate, attachServerWait, median, rating, renderPerfMarkdown, representative } from '../src/perf/index.js';
-import { clsOf, hotFunctions, tbtOf, unusedJsBytes } from '../src/perf/measure.js';
+import { PERF_PROFILES, clsOf, hotFunctions, tbtOf, unusedJsBytes } from '../src/perf/measure.js';
+import { siteOf } from '../src/perf/metrics.js';
 import { runCli } from './helpers/cli.js';
+import { FIXTURES } from './helpers/static-server.js';
 import { startSlowServer } from './helpers/slow-server.js';
 
 describe('perf arithmetic', () => {
@@ -78,6 +81,159 @@ describe('perf arithmetic', () => {
   });
 });
 
+/** A measured route with nothing wrong; tests add one problem at a time. */
+function route(over = {}, visitOver = {}) {
+  const url = over.url ?? 'http://127.0.0.1:3000/';
+  return {
+    route: '/',
+    url,
+    status: 'ok',
+    framework: null,
+    devServer: false,
+    metrics: aggregate([{ metrics: { lcp: 1500, fcp: 900, tbt: 50, cls: 0, bytes: 100000 } }]),
+    ...over,
+    visit: {
+      lcp: 1500,
+      fcp: 900,
+      lcpElement: null,
+      images: [],
+      shifts: [],
+      loafs: [],
+      fonts: [],
+      coverage: [],
+      hotFunctions: [],
+      requests: [{ url, method: 'GET', type: 'Document', start: 0, end: 100, bytes: 5000, serverWait: 50, mime: 'text/html' }],
+      ...visitOver,
+    },
+  };
+}
+const mobile = PERF_PROFILES.mobile;
+const desktop = PERF_PROFILES.desktop;
+
+describe('findings', () => {
+  test('impact: big savings, or crossing a Core Web Vitals threshold; already good caps at medium', () => {
+    assert.equal(impactOf('lcp', 1400, 4800), 'high');
+    assert.equal(impactOf('lcp', 300, 4100), 'high', 'poor → needs improvement');
+    assert.equal(impactOf('lcp', 300, 3500), 'medium');
+    assert.equal(impactOf('lcp', 2000, 2400), 'medium', 'already good');
+    assert.equal(impactOf('tbt', 60, 230), 'low', 'crosses, but a small saving');
+    assert.equal(impactOf('cls', 0.076, 0.121), 'high');
+    assert.equal(impactOf('cls', 0, 0.121), 'low');
+    assert.equal(impactOf('bytes', 193), 'medium');
+    assert.equal(impactOf('bytes', 600), 'high');
+  });
+
+  test('buckets: do first is worth it and low risk; your call is a business decision', () => {
+    assert.equal(bucketOf({ impact: 'medium', fixRisk: 'low' }), 'do-first');
+    assert.equal(bucketOf({ impact: 'high', fixRisk: 'high' }), 'plan');
+    assert.equal(bucketOf({ impact: 'medium', fixRisk: 'medium' }), 'plan');
+    assert.equal(bucketOf({ impact: 'medium', fixRisk: 'high' }), 'nice');
+    assert.equal(bucketOf({ impact: 'low', fixRisk: 'low' }), 'nice');
+    assert.equal(bucketOf({ impact: 'high', fixRisk: 'low', decision: true }), 'your-call');
+    assert.deepEqual(BUCKETS.map((b) => b.id), ['do-first', 'plan', 'nice', 'your-call']);
+  });
+
+  test('a clean route has nothing to fix', () => {
+    assert.deepEqual(findRouteIssues(route(), mobile), []);
+  });
+
+  test('LCP image savings stop at LCP − FCP: nothing done to the image paints before the first paint', () => {
+    const e = { selector: 'img.hero', tag: 'img', url: 'http://127.0.0.1:3000/hero.jpg', srcAttr: '/hero.jpg', loading: 'lazy', inHtml: true, preloaded: false, rect: { width: 400, height: 200 }, natural: { width: 400, height: 200 } };
+    const req = { url: e.url, method: 'GET', type: 'Image', start: 900, end: 1400, bytes: 30000, mime: 'image/jpeg' };
+    const tight = findRouteIssues(route({}, { lcp: 1000, fcp: 980, lcpElement: e, requests: [route().visit.requests[0], req] }), mobile);
+    assert.deepEqual(tight, [], 'only 20 ms between first paint and LCP');
+    const [lazy] = findRouteIssues(route({}, { lcp: 2000, fcp: 900, lcpElement: e, requests: [route().visit.requests[0], req] }), mobile);
+    assert.equal(lazy.category, 'lcp-lazy');
+    assert.equal(lazy.savings.ms, 800);
+    assert.match(lazy.evidence, /started 800 ms after the HTML arrived/);
+  });
+
+  test('an LCP image a script puts in the page is found late; next/image is the Next.js fix', () => {
+    const e = { selector: 'img.hero', tag: 'img', url: 'http://127.0.0.1:3000/hero.jpg', srcAttr: '/hero.jpg', loading: null, inHtml: false, preloaded: false, rect: { width: 400, height: 200 }, natural: { width: 400, height: 200 } };
+    const req = { url: e.url, method: 'GET', type: 'Image', start: 1500, end: 1900, bytes: 30000, mime: 'image/jpeg' };
+    const [f] = findRouteIssues(route({ framework: 'next' }, { lcp: 3000, fcp: 900, lcpElement: e, requests: [route().visit.requests[0], req] }), mobile);
+    assert.equal(f.category, 'lcp-discovery');
+    assert.match(f.evidence, /not in the HTML the server sends/);
+    assert.match(f.fix, /rel="preload" as="image" href="\/hero\.jpg"/);
+    assert.deepEqual(f.frameworkFix.framework, 'next');
+    assert.match(f.frameworkFix.text, /priority/);
+  });
+
+  test('only first-party code is a long task here; a vendor is grouped by vendor', () => {
+    const hot = [
+      { fn: 'renderGrid', url: 'http://127.0.0.1:3000/app.js', line: 12, column: 1, self: 90 },
+      { fn: 'boot', url: 'http://127.0.0.1:9999/widget.js', line: 1, column: 1, self: 300 },
+      { fn: 'tiny', url: 'http://127.0.0.1:3000/app.js', line: 40, column: 1, self: 10 },
+    ];
+    const found = findRouteIssues(route({}, { hotFunctions: hot }), mobile);
+    assert.deepEqual(found.map((f) => [f.category, f.culprit.fn]), [['long-task', 'renderGrid']]);
+    assert.equal(found[0].savings.ms, 90 * 4 - 50);
+    assert.deepEqual(findRouteIssues(route({}, { hotFunctions: hot }), desktop), [], '90 ms unthrottled is under the bar without a long frame');
+  });
+
+  test('a slow server, hiding fonts, unused CSS and uncompressed text (away from localhost)', () => {
+    const url = 'https://shop.example.com/';
+    const doc = { url, method: 'GET', type: 'Document', start: 0, end: 1400, bytes: 40000, serverWait: 1300, mime: 'text/html' };
+    const font = { url: 'https://shop.example.com/brand.woff2', method: 'GET', type: 'Font', start: 1500, end: 2600, bytes: 30000, mime: 'font/woff2', encoding: null };
+    const js = { url: 'https://cdn.example.com/app.js', method: 'GET', type: 'Script', start: 1400, end: 1900, bytes: 300000, mime: 'application/javascript' };
+    const metrics = aggregate([{ metrics: { lcp: 4500, fcp: 2600, tbt: 50, cls: 0, bytes: 400000 } }]);
+    const found = findRouteIssues(route({ url, metrics }, {
+      lcp: 4500,
+      fcp: 2600,
+      requests: [doc, font, js],
+      fonts: [{ family: 'Brand', display: 'auto', status: 'loaded' }],
+      coverage: [{ url: 'https://shop.example.com/site.css', type: 'css', total: 80000, unused: 70000 }],
+    }), mobile);
+    const by = Object.fromEntries(found.map((f) => [f.category, f]));
+    assert.deepEqual(Object.keys(by).sort(), ['font', 'server', 'transfer', 'unused-code']);
+    assert.equal(by.server.fixRisk, 'high');
+    assert.equal(by.server.savings.ms, 1100);
+    assert.equal(by.server.bucket, 'plan');
+    assert.match(by.font.title, /Brand/);
+    assert.equal(by.font.savings.ms, 1100, 'hidden from the font request until it arrives');
+    assert.match(by.font.fix, /font-display: swap/);
+    assert.match(by['unused-code'].fix, /unused rules/);
+    assert.match(by.transfer.evidence, /cdn\.example\.com\/app\.js/, 'another subdomain of the same site is first-party');
+    const local = findRouteIssues(route({}, { requests: [{ ...doc, url: 'http://127.0.0.1:3000/', serverWait: 50 }, { ...js, url: 'http://127.0.0.1:3000/app.js' }] }), mobile);
+    assert.deepEqual(local, [], 'local servers rarely compress like production');
+  });
+
+  test('layout shifts: grouped by cause, and a cause saves only what CLS would drop without it', () => {
+    const shifts = [
+      { t: 500, value: 0.12, sources: ['h1'], cause: { kind: 'unsized-image', selector: 'img.hero', t: null } },
+      { t: 4000, value: 0.04, sources: ['main'], cause: { kind: 'inserted', selector: 'div.promo', t: 3990 } },
+    ];
+    const found = findRouteIssues(route({ metrics: aggregate([{ metrics: { lcp: 1500, fcp: 900, tbt: 50, cls: 0.12 } }]) }, { shifts }), mobile);
+    const hero = found.find((f) => f.culprit.selector === 'img.hero');
+    const promo = found.find((f) => f.culprit.selector === 'div.promo');
+    assert.equal(hero.savings.cls, 0.08);
+    assert.equal(hero.confidence, 'estimated', 'the image was found by position, not by time');
+    assert.equal(hero.bucket, 'do-first');
+    assert.equal(promo.savings.cls, 0);
+    assert.equal(promo.bucket, 'nice');
+    assert.equal(savingLabel(promo), 'shift 0.04');
+    assert.match(promo.evidence, /comes from a worse burst of shifts/);
+  });
+
+  test('ranking merges a culprit found on two routes and orders by bucket, then score', () => {
+    const a = { id: 'x:1', bucket: 'plan', score: 1, metric: 'tbt', savings: { ms: 300 }, routes: ['/'] };
+    const b = { id: 'x:1', bucket: 'plan', score: 1.5, metric: 'tbt', savings: { ms: 450 }, routes: ['/b'] };
+    const c = { id: 'y:1', bucket: 'do-first', score: 0.2, metric: 'lcp', savings: { ms: 100 }, routes: ['/'] };
+    const d = { id: 'z:1', bucket: 'plan', score: 2, metric: 'bytes', savings: { kb: 900 }, routes: ['/'] };
+    const ranked = rankFindings([[a, c], [b, d]]);
+    assert.deepEqual(ranked.map((f) => f.id), ['y:1', 'z:1', 'x:1']);
+    assert.deepEqual(ranked[2].routes, ['/', '/b']);
+    assert.equal(ranked[2].savings.ms, 450, 'the larger estimate is kept');
+  });
+
+  test('siteOf tells first-party from third-party', () => {
+    assert.equal(siteOf('https://cdn.example.com/a.js'), 'example.com');
+    assert.equal(siteOf('https://a.shop.example.co.uk/'), 'example.co.uk');
+    assert.equal(siteOf('http://127.0.0.1:4330/x'), '127.0.0.1:4330');
+    assert.equal(siteOf('http://localhost:3000/'), 'localhost:3000');
+  });
+});
+
 describe('parsePerfArgs', () => {
   test('defaults', () => {
     const o = parsePerfArgs(['localhost:3000/shop']);
@@ -130,6 +286,8 @@ describe('mantis perf on slow-app (end-to-end)', { concurrency: false }, () => {
   let desktop;
   let mobile;
   let md;
+  let mobileMd;
+  let mobileStdout;
   const route = (report, r) => report.routes.find((x) => x.route === r);
   const req = (visit, re) => visit.requests.find((q) => re.test(q.url));
 
@@ -137,13 +295,15 @@ describe('mantis perf on slow-app (end-to-end)', { concurrency: false }, () => {
     tmp = await mkdtemp(path.join(os.tmpdir(), 'mantis-perf-'));
     server = await startSlowServer();
     let res = await runCli(['perf', `${server.url}/`, '--routes', '/,/fast,/dev', '--runs', '2', '--profile', 'desktop', '--out', path.join(tmp, 'd')]);
-    assert.equal(res.code, 0, res.stderr);
+    assert.equal(res.code, 1, res.stderr);
     assert.match(res.stdout, /report {2}.*perf\.md/);
     desktop = JSON.parse(readFileSync(path.join(tmp, 'd', 'perf', 'latest', 'perf.json'), 'utf8'));
     md = readFileSync(path.join(tmp, 'd', 'perf', 'latest', 'perf.md'), 'utf8');
     res = await runCli(['perf', `${server.url}/`, '--runs', '1', '--out', path.join(tmp, 'm')]);
-    assert.equal(res.code, 0, res.stderr);
+    assert.equal(res.code, 1, res.stderr);
+    mobileStdout = res.stdout;
     mobile = JSON.parse(readFileSync(path.join(tmp, 'm', 'perf', 'latest', 'perf.json'), 'utf8'));
+    mobileMd = readFileSync(path.join(tmp, 'm', 'perf', 'latest', 'perf.md'), 'utf8');
   });
 
   after(async () => {
@@ -211,5 +371,34 @@ describe('mantis perf on slow-app (end-to-end)', { concurrency: false }, () => {
     assert.ok(m.metrics.tbt.median > d.metrics.tbt.median, `mobile TBT ${m.metrics.tbt.median} vs desktop ${d.metrics.tbt.median}`);
     const e = m.visit.lcpElement;
     assert.ok(e.natural.width >= 2 * e.rect.width, JSON.stringify(e));
+  });
+
+  test('every planted problem with an expected finding is reported, in its bucket (mobile)', () => {
+    const planted = JSON.parse(readFileSync(path.join(FIXTURES, 'slow-app', 'PLANTED.json'), 'utf8'));
+    const all = JSON.stringify(mobile.findings.map((f) => [f.bucket, f.category, f.culprit]), null, 1);
+    for (const p of planted.problems.filter((x) => x.finding)) {
+      const want = p.finding;
+      const match = mobile.findings.find((f) => f.category === want.category
+        && Object.entries(want.culprit ?? {}).every(([k, re]) => new RegExp(re).test(f.culprit[k] ?? ''))
+        && (!want.fix || new RegExp(want.fix).test(f.fix)));
+      assert.ok(match, `${p.id}: no ${want.category} finding matching ${JSON.stringify(want)}\n${all}`);
+      if (want.bucket) assert.equal(match.bucket, want.bucket, `${p.id} is in ${match.bucket}`);
+      assert.deepEqual(match.routes, ['/']);
+    }
+  });
+
+  test('findings are ranked by bucket, the vendor is left to the third-party findings, and the report leads with fixes', () => {
+    const order = BUCKETS.map((b) => b.id);
+    const idx = mobile.findings.map((f) => order.indexOf(f.bucket));
+    assert.deepEqual(idx, [...idx].sort((a, b) => a - b));
+    assert.ok(!mobile.findings.some((f) => /widget\.js/.test(JSON.stringify(f.culprit))), 'no first-party finding blames the vendor');
+    assert.equal(mobile.summary.findings, mobile.findings.length);
+    assert.ok(mobileMd.indexOf('## Fixes, ranked') < mobileMd.indexOf('## `/`'));
+    assert.match(mobileMd, /### Do first \(worth it, low risk\)/);
+    assert.match(mobileStdout, /Fixes: \d+ do first · \d+ plan/);
+  });
+
+  test('a lean page has nothing to fix', () => {
+    assert.ok(!desktop.findings.some((f) => f.routes.includes('/fast')), JSON.stringify(desktop.findings.filter((f) => f.routes.includes('/fast'))));
   });
 });
