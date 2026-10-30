@@ -9,6 +9,6 @@
   "homepage": "https://github.com/vulinh1704/mantis",
   "repository": "https://github.com/vulinh1704/mantis",
   "license": "MIT",
-  "logo": "https://raw.githubusercontent.com/vulinh1704/mantis/main/assets/mantis-128.png",
+  "logo": "assets/logo.png",
   "keywords": ["ui", "frontend", "visual-qa", "responsive", "dark-mode", "accessibility", "playwright"]
 }
