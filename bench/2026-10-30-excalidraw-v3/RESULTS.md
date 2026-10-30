@@ -6,7 +6,7 @@
 - Model: `claude-opus-5-5`, run through Claude Code 2.1.311 on the subscription.
 - Runs: 12, made of {with, without} × {neutral, pressure} × 3.
 - Fixture, grader, prompts and harness: the same as v2 ([`../2026-10-29-excalidraw-v2/RESULTS.md`](../2026-10-29-excalidraw-v2/RESULTS.md)).
-- The only change is the Mantis on main at 75ea716, which is not released yet. It adds three PRs on top of v0.3.1:
+- The only change is the Mantis on main at 75ea716. It was released afterwards as v0.4.0, together with #14 (`.mantis/.gitignore`). It adds three PRs on top of v0.3.1:
   - **#11:** contrast and theme-leak measured from screenshot pixels when axe cannot compute the background (canvas apps, transparent layers).
   - **#12:** `page-overflow` finds masking app shells nested up to 4 levels deep.
   - **#13:** the skill says that a clean report only covers what Mantis measures, and that the agent must look again after each fix.
@@ -89,9 +89,9 @@ When Mantis is blind, the agent inherits the blind spot (v2). That is why a fres
 
 ## Next
 
-- **`.mantis/.gitignore`:** have Mantis write it on its first run, so reports never end up in a commit.
+- **`.mantis/.gitignore`:** done in #14. Mantis now writes it on its first run, so reports never end up in a commit.
 - **A fresh fixture** whose bugs Mantis was not tuned on, to measure v0.4 without the design bias above.
-- **Release v0.4.0**, once the user approves it.
+- **Released as v0.4.0** on 2026-10-30.
 
 ## Files
 
