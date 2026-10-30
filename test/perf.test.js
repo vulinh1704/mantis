@@ -16,6 +16,8 @@ import { BUCKETS, bucketOf, findRouteIssues, impactOf, rankFindings, savingLabel
 import { aggregate, attachServerWait, median, rating, renderPerfMarkdown, representative } from '../src/perf/index.js';
 import { PERF_PROFILES, clsOf, hotFunctions, tbtOf, unusedJsBytes } from '../src/perf/measure.js';
 import { siteOf } from '../src/perf/metrics.js';
+import { apiPattern, appApis } from '../src/perf/network.js';
+import { vendorOf } from '../src/perf/vendors.js';
 import { runCli } from './helpers/cli.js';
 import { FIXTURES } from './helpers/static-server.js';
 import { startSlowServer } from './helpers/slow-server.js';
@@ -208,6 +210,9 @@ describe('findings', () => {
     const promo = found.find((f) => f.culprit.selector === 'div.promo');
     assert.equal(hero.savings.cls, 0.08);
     assert.equal(hero.confidence, 'estimated', 'the image was found by position, not by time');
+    const fitted = findRouteIssues(route({}, { shifts: [{ ...shifts[0], cause: { ...shifts[0].cause, moved: 258, fits: true } }] }), mobile)[0];
+    assert.equal(fitted.confidence, 'measured', 'the content moved exactly the image\'s height');
+    assert.match(fitted.evidence, /258 px down, as tall as `img\.hero`/);
     assert.equal(hero.bucket, 'do-first');
     assert.equal(promo.savings.cls, 0);
     assert.equal(promo.bucket, 'nice');
@@ -224,6 +229,105 @@ describe('findings', () => {
     assert.deepEqual(ranked.map((f) => f.id), ['y:1', 'z:1', 'x:1']);
     assert.deepEqual(ranked[2].routes, ['/', '/b']);
     assert.equal(ranked[2].savings.ms, 450, 'the larger estimate is kept');
+  });
+
+  test('API calls: own site, or an unknown host the app itself calls; ids collapse into a pattern', () => {
+    const page = 'https://shop.example.com/';
+    const own = { initiator: { url: 'https://shop.example.com/app.js' } };
+    const reqs = [
+      { url: 'https://api.example.com/v1/cart', type: 'Fetch', ...own },
+      { url: 'https://shop-backend.fly.dev/orders', type: 'XHR', ...own },
+      { url: 'https://www.google-analytics.com/g/collect', type: 'Fetch', ...own },
+      { url: 'https://unknown-vendor.io/ping', type: 'Fetch', initiator: { url: 'https://unknown-vendor.io/sdk.js' } },
+      { url: 'https://shop.example.com/app.js', type: 'Script' },
+    ];
+    assert.deepEqual(appApis(reqs, page).map((q) => new URL(q.url).host), ['api.example.com', 'shop-backend.fly.dev']);
+    assert.equal(apiPattern('https://x.io/api/products/42?user=7&sort=asc'), '/api/products/:id?sort=asc&user=:id');
+    assert.equal(apiPattern('https://x.io/u/3f2b8c1e-1a2b-4c3d-8e9f-001122334455/avatar'), '/u/:id/avatar');
+    assert.deepEqual(vendorOf('https://widget.intercom.io/widget/abc'), { id: 'Intercom', name: 'Intercom', category: 'chat' });
+    assert.equal(vendorOf('https://fonts.googleapis.com/css2?family=Inter').name, 'Google Fonts');
+    assert.equal(vendorOf('https://maps.googleapis.com/maps/api/js').name, 'Google Maps');
+    assert.deepEqual(vendorOf('https://cdn.acme-widgets.com/w.js'), { id: 'acme-widgets.com', name: 'acme-widgets.com', category: 'other' });
+  });
+
+  test('API findings: slow, chain, duplicate, N+1 and payload, each traced to the code that called it', () => {
+    const base = 'https://shop.example.com';
+    const call = (path, start, end, extra = {}) => ({
+      url: `${base}${path}`, method: 'GET', type: 'Fetch', start, end, duration: end - start, bytes: 2000, encoding: 'br', serverWait: 80,
+      initiator: { type: 'script', url: `${base}/app.js`, line: 10, fn: 'load', frames: [{ fn: 'load', url: `${base}/app.js`, line: 10 }, { fn: 'main', url: `${base}/app.js`, line: 40 }] },
+      ...extra,
+    });
+    const doc = { url: `${base}/`, method: 'GET', type: 'Document', start: 0, end: 200, bytes: 9000, serverWait: 100, encoding: 'br', mime: 'text/html' };
+    const app = { url: `${base}/app.js`, method: 'GET', type: 'Script', start: 210, end: 400, bytes: 9000, encoding: 'br', mime: 'text/javascript' };
+    const requests = [
+      doc, app,
+      call('/api/me', 420, 1300, { serverWait: 850 }),
+      call('/api/cart', 1310, 1500),
+      ...[1, 2, 3, 4].map((id) => call(`/api/items/${id}`, 1510, 1700)),
+      call('/api/cart', 1720, 1900),
+      call('/api/feed', 420, 900, { bytes: 300 * 1024 }),
+    ];
+    const found = findRouteIssues(route({ url: `${base}/`, metrics: aggregate([{ metrics: { lcp: 1500, fcp: 600, tbt: 0, cls: 0, data: 1900 } }]) }, { lcp: 1500, fcp: 600, requests }), desktop);
+    const by = (c) => found.filter((f) => f.category === c);
+    assert.equal(by('api-slow').length, 1);
+    assert.match(by('api-slow')[0].title, /GET \/api\/me takes 850 ms on the server/);
+    assert.equal(by('api-slow')[0].fixRisk, 'high');
+    const [chain] = by('api-chain');
+    assert.match(chain.title, /\/api\/me → \/api\/cart → \/api\/items\/:id → \/api\/cart/);
+    assert.equal(chain.savings.ms, 1900 - 420 - 880);
+    const [dup] = by('api-duplicate');
+    assert.match(dup.title, /GET \/api\/cart is called 2 times/);
+    assert.equal(dup.savings.ms, 180);
+    assert.match(dup.evidence, /`load` \/app\.js:10 ← `main` \/app\.js:40/);
+    const [n1] = by('api-n-plus-1');
+    assert.match(n1.title, /4 calls to \/api\/items\/:id, one per item/);
+    assert.match(n1.fix, /\/api\/items\?ids=1,2,3/);
+    const [payload] = by('api-payload');
+    assert.match(payload.title, /\/api\/feed sends 300 KB/);
+    assert.deepEqual(by('api-late'), [], 'the first call starts right after its script arrives');
+  });
+
+  test('vendors: grouped, with a facade for chat, render-blocking fonts, and a business decision when costly', () => {
+    const page = 'http://127.0.0.1:3000/';
+    const doc = { url: page, method: 'GET', type: 'Document', start: 0, end: 100, bytes: 5000, mime: 'text/html' };
+    const requests = [
+      doc,
+      { url: 'https://fonts.googleapis.com/css2?family=Inter', method: 'GET', type: 'Stylesheet', start: 110, end: 700, bytes: 1500, renderBlocking: true },
+      { url: 'https://fonts.gstatic.com/s/inter.woff2', method: 'GET', type: 'Font', start: 710, end: 900, bytes: 48000 },
+      { url: 'https://widget.intercom.io/widget/abc', method: 'GET', type: 'Script', start: 300, end: 800, bytes: 90000, initiator: { url: page, line: 12 } },
+      { url: 'https://js.intercomcdn.com/frame.js', method: 'GET', type: 'Script', start: 820, end: 1200, bytes: 250000 },
+    ];
+    const scriptTime = [{ url: 'https://js.intercomcdn.com/frame.js', self: 120 }, { url: 'https://widget.intercom.io/widget/abc', self: 10 }];
+    const found = findRouteIssues(route({}, { fcp: 750, requests, scriptTime }), mobile);
+    const fonts = found.find((f) => f.category === 'third-party' && f.vendor.name === 'Google Fonts');
+    assert.equal(fonts.metric, 'fcp');
+    assert.equal(fonts.savings.ms, 600);
+    assert.match(fonts.fix, /Self-host/);
+    const chat = found.find((f) => f.category === 'third-party' && f.vendor.name === 'Intercom');
+    assert.equal(chat.vendor.mainThreadMs, 520);
+    assert.equal(chat.vendor.requests, 2);
+    assert.match(chat.title, /Intercom \(chat\): 520 ms of main thread, 332 KB/);
+    assert.match(chat.fix, /facade/);
+    assert.equal(chat.culprit.from, `${page}:12`);
+    const cost = found.find((f) => f.category === 'third-party-cost');
+    assert.equal(cost.bucket, 'your-call');
+    assert.match(cost.title, /Is Intercom worth 520 ms of main thread and 332 KB on every visit\?/);
+    assert.ok(!found.some((f) => f.category === 'render-blocking'), 'a vendor\'s blocking file is part of its own finding');
+  });
+
+  test('a first API call made late is traced to the script it waited for', () => {
+    const page = 'http://127.0.0.1:3000/';
+    const requests = [
+      { url: page, method: 'GET', type: 'Document', start: 0, end: 100 },
+      { url: `${page}vendor.js`, method: 'GET', type: 'Script', start: 110, end: 2400, bytes: 900000 },
+      { url: `${page}app.js`, method: 'GET', type: 'Script', start: 110, end: 300, bytes: 4000 },
+      { url: `${page}api/me`, method: 'GET', type: 'Fetch', start: 2420, end: 2600, duration: 180, serverWait: 50, initiator: { url: `${page}app.js`, line: 3, fn: 'boot' } },
+    ];
+    const [late] = findRouteIssues(route({}, { requests }), desktop).filter((f) => f.category === 'api-late');
+    assert.equal(late.savings.ms, 2120);
+    assert.equal(late.culprit.waitedFor, `${page}vendor.js`);
+    assert.match(late.evidence, /after \/vendor\.js finished loading \(2\.4 s\) and ran/);
+    assert.match(late.fix, /rel="preload" as="fetch" href="\/api\/me"/);
   });
 
   test('siteOf tells first-party from third-party', () => {
@@ -367,7 +471,9 @@ describe('mantis perf on slow-app (end-to-end)', { concurrency: false }, () => {
     const m = route(mobile, '/');
     const d = route(desktop, '/');
     assert.equal(mobile.profile.name, 'mobile');
-    assert.ok(m.metrics.lcp.median > d.metrics.lcp.median * 2, `mobile LCP ${m.metrics.lcp.median} vs desktop ${d.metrics.lcp.median}`);
+    // Slow 4G adds 562 ms to every round trip; a ratio would depend on how fast the machine is.
+    assert.ok(m.metrics.fcp.median > d.metrics.fcp.median + 400, `mobile FCP ${m.metrics.fcp.median} vs desktop ${d.metrics.fcp.median}`);
+    assert.ok(m.metrics.lcp.median > d.metrics.lcp.median + 1000, `mobile LCP ${m.metrics.lcp.median} vs desktop ${d.metrics.lcp.median}`);
     assert.ok(m.metrics.tbt.median > d.metrics.tbt.median, `mobile TBT ${m.metrics.tbt.median} vs desktop ${d.metrics.tbt.median}`);
     const e = m.visit.lcpElement;
     assert.ok(e.natural.width >= 2 * e.rect.width, JSON.stringify(e));
@@ -391,7 +497,11 @@ describe('mantis perf on slow-app (end-to-end)', { concurrency: false }, () => {
     const order = BUCKETS.map((b) => b.id);
     const idx = mobile.findings.map((f) => order.indexOf(f.bucket));
     assert.deepEqual(idx, [...idx].sort((a, b) => a - b));
-    assert.ok(!mobile.findings.some((f) => /widget\.js/.test(JSON.stringify(f.culprit))), 'no first-party finding blames the vendor');
+    const vendorBlamed = mobile.findings.filter((f) => /widget\.js/.test(JSON.stringify(f.culprit))).map((f) => f.category);
+    assert.deepEqual(vendorBlamed.sort(), ['third-party', 'third-party-cost'], 'the vendor shows up as a vendor only');
+    const vendor = mobile.findings.find((f) => f.category === 'third-party');
+    assert.ok(vendor.vendor.mainThreadMs > 250, JSON.stringify(vendor.vendor));
+    assert.equal(route(mobile, '/').metrics.data.values.length, 1, 'when the API data was in is a metric');
     assert.equal(mobile.summary.findings, mobile.findings.length);
     assert.ok(mobileMd.indexOf('## Fixes, ranked') < mobileMd.indexOf('## `/`'));
     assert.match(mobileMd, /### Do first \(worth it, low risk\)/);
