@@ -70,7 +70,10 @@ function perfInitScript() {
   });
   observe('layout-shift', (e) => {
     if (e.hadRecentInput) return;
-    P.shifts.push({ t: e.startTime, value: e.value, nodes: (e.sources || []).map((s) => s.node).filter(Boolean) });
+    const sources = e.sources || [];
+    // How far the content moved down: what pushed it is usually about that tall.
+    const dy = Math.max(0, ...sources.map((s) => s.currentRect.y - s.previousRect.y));
+    P.shifts.push({ t: e.startTime, value: e.value, nodes: sources.map((s) => s.node).filter(Boolean), dy });
   });
   observe('longtask', (e) => P.longtasks.push({ t: e.startTime, duration: e.duration }));
   observe('long-animation-frame', (e) => {
@@ -220,10 +223,11 @@ function collectInPage() {
       natural: isImg ? { width: lcpEl.naturalWidth, height: lcpEl.naturalHeight } : null,
     };
   }
-  // The likeliest cause of each layout shift, above the elements that moved: the latest element
-  // inserted (or container filled) or image loaded in the second before it; else an image with no
-  // size above them (on a slow network its size is known, and the page jumps, long before it has
-  // loaded); else a web font that just swapped in.
+  // The likeliest cause of each layout shift, above the elements that moved. Candidates: an element
+  // inserted (or a container filled) or an image loaded in the second before it, and any image with
+  // no size (on a slow network its size is known, and the page jumps, long before it has loaded).
+  // The one about as tall as the distance the content moved wins; else the latest in time; else a
+  // web font that just swapped in.
   const unsized = (img) => !(img.hasAttribute('width') && img.hasAttribute('height')) && getComputedStyle(img).aspectRatio === 'auto';
   const addedAt = new Map();
   for (const a of P.added) {
@@ -237,30 +241,26 @@ function collectInPage() {
     const top = tops.length ? Math.min(...tops) : Infinity;
     const above = (node) => node.getBoundingClientRect().top <= top + 1;
     const near = (t) => t >= s.t - 1000 && t <= s.t + 20;
-    let best = null;
-    const consider = (c) => {
-      if (near(c.t) && (!best || c.t > best.t)) best = c;
-    };
+    const cands = [];
     for (const a of P.added) {
-      if (!a.node.isConnected || !above(a.node)) continue;
+      if (!a.node.isConnected || !above(a.node) || !near(a.t)) continue;
       const parent = a.node.parentElement;
       const siblings = addedAt.get(`${a.t}`)?.get(a.node.parentNode) || 0;
-      if (siblings > 1 && parent) consider({ t: a.t, kind: 'filled', node: parent });
-      else consider({ t: a.t, kind: 'inserted', node: a.node });
+      cands.push(siblings > 1 && parent ? { t: a.t, kind: 'filled', node: parent } : { t: a.t, kind: 'inserted', node: a.node });
     }
     for (const l of P.loaded) {
-      if (l.node.isConnected && above(l.node)) consider({ t: l.t, kind: unsized(l.node) ? 'unsized-image' : 'image', node: l.node });
+      if (l.node.isConnected && above(l.node) && near(l.t)) cands.push({ t: l.t, kind: unsized(l.node) ? 'unsized-image' : 'image', node: l.node });
     }
-    if (!best) {
-      let img = null;
-      for (const i of document.images) {
-        const r = i.getBoundingClientRect();
-        if (unsized(i) && r.height > 0 && r.bottom <= top + 1 && (!img || r.bottom > img.getBoundingClientRect().bottom)) img = i;
-      }
-      if (img) best = { t: null, kind: 'unsized-image', node: img };
+    for (const i of document.images) {
+      const r = i.getBoundingClientRect();
+      if (unsized(i) && r.height > 0 && r.bottom <= top + 1 && !cands.some((c) => c.node === i)) cands.push({ t: null, kind: 'unsized-image', node: i });
     }
-    if (!best) for (const t of P.fontsDone) consider({ t, kind: 'font', node: null });
-    return best ? { kind: best.kind, selector: best.node ? sel(best.node) : null, t: best.t == null ? null : Math.round(best.t) } : null;
+    const fits = (c) => s.dy > 0 && Math.abs(c.node.getBoundingClientRect().height - s.dy) <= Math.max(4, s.dy * 0.3);
+    const latest = (list) => list.sort((a, b) => (b.t ?? -Infinity) - (a.t ?? -Infinity))[0] ?? null;
+    const fit = latest(cands.filter(fits));
+    let best = fit ?? latest(cands.filter((c) => c.t != null)) ?? latest(cands);
+    if (!best) best = latest(P.fontsDone.filter(near).map((t) => ({ t, kind: 'font', node: null })));
+    return best ? { kind: best.kind, selector: best.node ? sel(best.node) : null, t: best.t == null ? null : Math.round(best.t), moved: Math.round(s.dy), fits: best === fit } : null;
   };
   const vh = innerHeight;
   const images = [...document.images].slice(0, 200).map((img) => {

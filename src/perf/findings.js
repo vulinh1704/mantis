@@ -309,10 +309,11 @@ export function findRouteIssues(r, profile) {
     add({
       category: 'cls-source', key, metric: 'cls',
       savings: { cls: saving, shift: value },
-      confidence: kind === 'unknown' ? 'heuristic' : g.cause.t == null ? 'estimated' : 'measured',
+      // Sure when the cause is as tall as the distance the content moved, or was seen happening just before.
+      confidence: kind === 'unknown' ? 'heuristic' : g.cause.fits || g.cause.t != null ? 'measured' : 'estimated',
       title: text[0],
       culprit: { selector: g.cause?.selector ?? [...g.moved][0] ?? null },
-      evidence: `${g.shifts.length} layout shift${g.shifts.length === 1 ? '' : 's'} worth ${value}${g.cause?.t != null ? ` at ${fmtMs(g.cause.t)}` : ''}; moved: ${moved || 'unknown'}.${
+      evidence: `${g.shifts.length} layout shift${g.shifts.length === 1 ? '' : 's'} worth ${value}${g.cause?.t != null ? ` at ${fmtMs(g.cause.t)}` : ''}; moved: ${moved || 'unknown'}${g.cause?.moved ? `, ${g.cause.moved} px down${g.cause.fits ? `, as tall as \`${sel}\`` : ''}` : ''}.${
         saving === 0 ? ` CLS (${cls}) comes from a worse burst of shifts, so this one counts only once that is fixed.`
         : saving < value ? ` CLS counts the worst burst of shifts only, so fixing this alone takes it from ${cls} to ${Math.round(without * 1000) / 1000}.` : ''}`,
       fix: text[1],
