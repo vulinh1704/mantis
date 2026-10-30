@@ -3,5 +3,5 @@
 !package-lock.json
 !bin/
 !src/
-!skills/
+!plugins/mantis/skills/
 !assets/mantis-128.png

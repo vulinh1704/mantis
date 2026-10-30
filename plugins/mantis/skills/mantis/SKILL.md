@@ -27,7 +27,7 @@ looks right" is not evidence. A Mantis run with zero errors is.
   (layout, theme, fonts, CSS reset).
 - Pages behind a login or onboarding: pass `--storage-state <file>`, a Playwright
   storage state with the session's cookies and localStorage. Ask the user for one,
-  or make it: `npx playwright codegen --save-storage=.mantis/auth.json <login-url>`
+  or make it: `npx playwright@1.64.1 codegen --save-storage=.mantis/auth.json <login-url>`
   (the user signs in and closes the window), or a short Playwright script that signs
   in with a dev or seed user and calls `context.storageState({ path })`. When the
   app only checks a localStorage flag (onboarding done), write the JSON by hand.
@@ -40,7 +40,7 @@ looks right" is not evidence. A Mantis run with zero errors is.
 mantis look http://localhost:3000 --routes /,/settings
 ```
 
-If `mantis` isn't installed, run `npx -y github:vulinh1704/mantis look …` instead.
+If `mantis` isn't installed, run `npx -y github:vulinh1704/mantis#v0.4.0 look …` instead.
 Without Node or a browser, use the Docker image (`ghcr.io/vulinh1704/mantis`, see the
 README for how it reaches a dev server on the host).
 

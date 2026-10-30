@@ -21,14 +21,14 @@ RUN npm ci --omit=dev \
 
 COPY bin ./bin
 COPY src ./src
-COPY skills ./skills
+COPY plugins/mantis/skills ./skills
 COPY assets/mantis-128.png ./assets/
 RUN chmod 755 bin/mantis.js \
  && ln -s /opt/mantis/bin/mantis.js /usr/local/bin/mantis \
  && git config --system --add safe.directory '*'
 
 LABEL org.opencontainers.image.title="mantis" \
-      org.opencontainers.image.description="Eyes for your coding agent: find layout, contrast, dark-mode and i18n bugs in a real browser, and catch fixes that only hide them." \
+      org.opencontainers.image.description="Catches the UI bugs your coding agent can't see, and the ones it hides: layout, contrast, dark-mode and i18n bugs in a real browser, and fixes that only hide them." \
       org.opencontainers.image.source="https://github.com/vulinh1704/mantis" \
       org.opencontainers.image.licenses="MIT"
 

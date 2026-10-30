@@ -16,8 +16,8 @@ Fix the cause, not the symptom. One wrong token can break twenty components; fix
 the token once.
 
 The commands below use `mantis`. If it isn't installed, run
-`npx -y github:vulinh1704/mantis …` with the same arguments
-(`npx -y github:vulinh1704/mantis look http://localhost:3000 --routes /`). Don't
+`npx -y github:vulinh1704/mantis#v0.4.0 …` with the same arguments
+(`npx -y github:vulinh1704/mantis#v0.4.0 look http://localhost:3000 --routes /`). Don't
 replace it with a screenshot script of your own: you would lose the before/after
 comparison and the cover-up check.
 

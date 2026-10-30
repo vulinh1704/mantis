@@ -10,7 +10,7 @@
     {
       "name": "mantis",
       "description": "Look at the UI before calling it done: every screen, theme and language, fixed at the root, with before/after proof.",
-      "source": "./",
+      "source": "./plugins/mantis",
       "category": "development",
       "keywords": ["ui", "frontend", "visual-qa", "responsive", "dark-mode"]
     }
