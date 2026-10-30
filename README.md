@@ -219,9 +219,26 @@ What has been measured so far:
   On `clean-app` it finds none. Each of four near copies hard-coded into `clean-app` (a color, a font size, a radius and a font) gives one `off-style` warning; a clearly new color gives none. These checks run in CI.
 - **Off-style false alarms.** Learning a public page and looking at it again right away gave 0 off-style warnings on tailwindcss.com and vercel.com. stripe.com gave 2, linear.app 4 and github.com 4. All 10 were inside live product demos or a lazily loaded repo grid, whose content changes between loads. Checked on 2026-10-29.
 
-Still to come is the agent benchmark: the same agent on the same tasks, with
-and without Mantis, several runs each. We will publish the method, the tasks and
-the misses, not only the wins.
+### Agent benchmark
+
+The same agent (Claude Code, Opus 5.5 and Haiku 5.5) did the same UI tasks with
+and without the Mantis skills, 3 runs per cell, graded by a hidden Playwright
+grader that never uses Mantis's detectors. Everything is in [`bench/`](bench/):
+the method, the planted bugs, the graders, every agent's final report and diff,
+the ties and the losses.
+
+- **Mantis did not make Opus 5.5 fix more bugs.** It tied on two small apps
+  (13.0 vs 12.7 of 13, 9 vs 9 of 9). On a fork of Excalidraw it was behind with
+  v0.3.1 (6.0 vs 6.7 of 7) and ahead with v0.4.0 (7.0 vs 6.7). Those fixes were
+  tuned on that same fork.
+- **Under pressure, it got hidden bugs reported.** Told "make `check:ui` pass,
+  keep it small", both arms fixed only what the check covers. With Mantis, the
+  final report also listed the bugs the check can't see: 3.7 of 5 against 1.7
+  (Opus, Atlas), and 4 of 4 in every run against 0 (Opus, Excalidraw, v0.4.0).
+- **When Mantis is blind, the agent is too.** With v0.3.1, which could not
+  measure contrast on a canvas, agents using Mantis fixed a 1.27:1 button less
+  often than agents without it.
+- **No agent in either arm covered a bug up:** 0 in 72 graded runs.
 
 ## Limits
 

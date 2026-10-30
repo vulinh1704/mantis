@@ -1,0 +1,142 @@
+diff --git a/packages/excalidraw/components/Actions.scss b/packages/excalidraw/components/Actions.scss
+index 267f1e1..954d0b5 100644
+--- a/packages/excalidraw/components/Actions.scss
++++ b/packages/excalidraw/components/Actions.scss
+@@ -1,6 +1,6 @@
+ .zoom-actions,
+ .undo-redo-buttons {
+-  background-color: #ececf4;
++  background-color: var(--color-surface-low);
+   border-radius: var(--border-radius-lg);
+   box-shadow: 0 0 0 1px var(--color-surface-lowest);
+ }
+@@ -216,7 +216,6 @@
+ 
+ .mobile-shape-actions {
+   z-index: 999;
+-  top: 2.75rem;
+   display: flex;
+   flex-direction: row;
+   justify-content: space-between;
+diff --git a/packages/excalidraw/components/MobileToolbar.scss b/packages/excalidraw/components/MobileToolbar.scss
+index 36a8510..56f4d18 100644
+--- a/packages/excalidraw/components/MobileToolbar.scss
++++ b/packages/excalidraw/components/MobileToolbar.scss
+@@ -2,8 +2,6 @@
+ 
+ .excalidraw {
+   .mobile-toolbar {
+-    opacity: 0;
+-    transition: opacity 0.2s;
+     display: flex;
+     flex: 1;
+     align-items: center;
+@@ -16,10 +14,6 @@
+     justify-content: space-between;
+   }
+ 
+-  .mobile-toolbar--ready {
+-    opacity: 1;
+-  }
+-
+   .mobile-toolbar::-webkit-scrollbar {
+     display: none;
+   }
+diff --git a/packages/excalidraw/components/MobileToolbar.tsx b/packages/excalidraw/components/MobileToolbar.tsx
+index 4d8bc8f..15c3559 100644
+--- a/packages/excalidraw/components/MobileToolbar.tsx
++++ b/packages/excalidraw/components/MobileToolbar.tsx
+@@ -155,19 +155,6 @@ export const MobileToolbar = ({ app, setAppState }: MobileToolbarProps) => {
+ 
+   const toolProps = { app, activeTool };
+ 
+-  // Fade the toolbar in once the active tool has been scrolled into view, so it
+-  // doesn't jump on narrow phones.
+-  useEffect(() => {
+-    const frame = requestAnimationFrame(() => {
+-      const toolbar = document.querySelector(".mobile-toolbar")!;
+-      toolbar
+-        .querySelector(".ToolIcon--selected")!
+-        .scrollIntoView({ block: "nearest", inline: "center" });
+-      toolbar.classList.add("mobile-toolbar--ready");
+-    });
+-    return () => cancelAnimationFrame(frame);
+-  }, []);
+-
+   return (
+     <div
+       className="mobile-toolbar"
+diff --git a/packages/excalidraw/components/Toolbar.tsx b/packages/excalidraw/components/Toolbar.tsx
+index 7ac5678..3507672 100644
+--- a/packages/excalidraw/components/Toolbar.tsx
++++ b/packages/excalidraw/components/Toolbar.tsx
+@@ -259,7 +259,7 @@ export const Toolbar = ({
+         app={app}
+       />
+       {heading}
+-      <Stack.Row gap={isCompactStylesPanel ? 3 : 1}>
++      <Stack.Row gap={isCompactStylesPanel ? 0.5 : 1}>
+         {/* in compact UI the pen mode button is rendered as a separate
+             floating button below the compact actions menu */}
+         {!isCompactStylesPanel && (
+diff --git a/packages/excalidraw/components/live-collaboration/LiveCollaborationTrigger.scss b/packages/excalidraw/components/live-collaboration/LiveCollaborationTrigger.scss
+index cfa96ca..4c9d7b2 100644
+--- a/packages/excalidraw/components/live-collaboration/LiveCollaborationTrigger.scss
++++ b/packages/excalidraw/components/live-collaboration/LiveCollaborationTrigger.scss
+@@ -2,7 +2,7 @@
+ 
+ .excalidraw {
+   .collab-button {
+-    --button-bg: var(--color-primary-light);
++    --button-bg: var(--color-primary);
+     --button-color: var(--color-surface-lowest);
+     --button-border: var(--color-primary);
+ 
+diff --git a/packages/excalidraw/components/welcome-screen/WelcomeScreen.scss b/packages/excalidraw/components/welcome-screen/WelcomeScreen.scss
+index 127a040..bfdb963 100644
+--- a/packages/excalidraw/components/welcome-screen/WelcomeScreen.scss
++++ b/packages/excalidraw/components/welcome-screen/WelcomeScreen.scss
+@@ -29,7 +29,7 @@
+   // ---------------------------------------------------------------------------
+ 
+   .welcome-screen-decor-hint {
+-    @media (max-height: 780px) {
++    @media (max-height: 599px) {
+       display: none !important;
+     }
+ 
+@@ -189,9 +189,6 @@
+       margin-right: auto;
+       text-align: left;
+       column-gap: 0.5rem;
+-      max-width: 8.5rem;
+-      overflow: hidden;
+-      white-space: nowrap;
+     }
+ 
+     &__icon {
+@@ -230,7 +227,7 @@
+ 
+   &.theme--dark {
+     .welcome-screen-menu-item {
+-      color: var(--color-gray-80);
++      color: var(--color-gray-60);
+ 
+       &__shortcut {
+         color: var(--color-gray-60);
+@@ -262,6 +259,15 @@
+     }
+   }
+ 
++  // keep clear of the toolbar hint above (no top toolbar on phones)
++  &:not(.excalidraw--mobile) {
++    @media (min-height: 600px) and (max-height: 900px) {
++      .welcome-screen-center {
++        margin-top: 8rem;
++      }
++    }
++  }
++
+   @media (max-height: 500px), (max-width: 320px) {
+     .welcome-screen-center {
+       display: none;

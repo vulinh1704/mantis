@@ -1,0 +1,146 @@
+diff --git a/account.html b/account.html
+index 2b92929..b83622d 100644
+--- a/account.html
++++ b/account.html
+@@ -31,18 +31,20 @@
+     <div class="container">
+       <h1 data-i18n="account.title">Your invoices</h1>
+       <p class="lead" data-i18n="account.lead">Everything you have billed this quarter.</p>
+-      <table class="invoices">
+-        <thead>
+-          <tr>
+-            <th data-i18n="table.number">Number</th>
+-            <th data-i18n="table.customer">Customer</th>
+-            <th data-i18n="table.due">Due</th>
+-            <th data-i18n="table.amount">Amount</th>
+-            <th data-i18n="table.status">Status</th>
+-          </tr>
+-        </thead>
+-        <tbody id="invoice-rows"></tbody>
+-      </table>
++      <div class="table-wrap">
++        <table class="invoices">
++          <thead>
++            <tr>
++              <th data-i18n="table.number">Number</th>
++              <th data-i18n="table.customer">Customer</th>
++              <th data-i18n="table.due">Due</th>
++              <th data-i18n="table.amount">Amount</th>
++              <th data-i18n="table.status">Status</th>
++            </tr>
++          </thead>
++          <tbody id="invoice-rows"></tbody>
++        </table>
++      </div>
+       <p class="caption" data-i18n="caption.updated">Updated 2 minutes ago · Figures in USD</p>
+ 
+       <section class="card profile" id="profile">
+diff --git a/css/components.css b/css/components.css
+index 093993e..8f4911e 100644
+--- a/css/components.css
++++ b/css/components.css
+@@ -1,5 +1,5 @@
+ /* Header */
+-.site-header { border-bottom: 1px solid var(--border); background: var(--bg); }
++.site-header { position: relative; border-bottom: 1px solid var(--border); background: var(--bg); }
+ .site-header .container { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 64px; }
+ .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; color: var(--text); text-decoration: none; }
+ .brand img { width: 28px; height: 28px; }
+@@ -13,18 +13,18 @@
+ }
+ 
+ /* Filter toolbar */
+-.filters { display: flex; gap: 8px; padding: 12px 0; }
++.filters { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 0; }
+ .filters button { flex: none; white-space: nowrap; min-height: 44px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; font-size: 15px; }
+ .filters button[aria-pressed="true"] { background: var(--brand); color: var(--brand-ink); border-color: var(--brand); }
+ 
+ /* Cards */
+ .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; color: var(--text); }
+ .card h3 { margin: 0 0 6px; font-size: 18px; }
+-.card--promo { --surface: #ffffff; border-color: var(--brand); }
++.card--promo { background: color-mix(in srgb, var(--brand) 8%, var(--surface)); border-color: var(--brand); }
+ 
+ /* Plans */
+ .plan { display: flex; flex-direction: column; gap: 8px; }
+-.plan__name { font-size: 20px; font-weight: 700; line-height: 1.4; height: 1.4em; overflow: hidden; margin: 0; }
++.plan__name { font-size: 20px; font-weight: 700; line-height: 1.4; min-height: 2.8em; margin: 0; }
+ .plan__price { font-size: 28px; font-weight: 800; letter-spacing: -0.02em; }
+ 
+ /* Social links */
+diff --git a/css/overlays.css b/css/overlays.css
+index 08c7b3d..b2c91bb 100644
+--- a/css/overlays.css
++++ b/css/overlays.css
+@@ -3,9 +3,12 @@
+ .chat-bubble svg { width: 26px; height: 26px; }
+ 
+ /* Cookie notice */
+-.cookie { position: fixed; left: 0; right: 0; bottom: 0; display: flex; gap: 12px; align-items: center; justify-content: space-between; padding: 14px 16px; background: var(--text); color: var(--bg); z-index: 40; }
++.cookie { position: fixed; left: 0; right: 0; bottom: 0; display: flex; gap: 12px; align-items: center; justify-content: space-between; padding: 14px 16px; background: var(--surface); color: var(--text); border-top: 1px solid var(--border); z-index: 40; }
+ .cookie p { margin: 0; font-size: 14px; }
+ .cookie .btn { flex: none; }
+ @media (min-width: 900px) {
+   .cookie { left: 24px; right: auto; bottom: 24px; max-width: 460px; border-radius: 12px; }
+ }
++@media (max-width: 899px) {
++  .cookie:not([hidden]) ~ .chat-bubble { bottom: 120px; }
++}
+diff --git a/css/table.css b/css/table.css
+index d4ba7ce..1f1a735 100644
+--- a/css/table.css
++++ b/css/table.css
+@@ -1,4 +1,6 @@
++.table-wrap { overflow-x: auto; }
+ .invoices { width: 100%; border-collapse: collapse; font-size: 15px; }
++.invoices .customer { white-space: normal; min-width: 12em; }
+ .invoices th, .invoices td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+ .invoices th { font-size: 13px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; }
+ .status { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 13px; font-weight: 600; }
+diff --git a/css/tokens.css b/css/tokens.css
+index 5976a73..174f861 100644
+--- a/css/tokens.css
++++ b/css/tokens.css
+@@ -3,7 +3,7 @@
+   --bg: #ffffff;
+   --surface: #f8fafc;
+   --text: #0f172a;
+-  --text-muted: #a1a1aa;
++  --text-muted: #556070;
+   --border: #e2e8f0;
+   --brand: #2563eb;
+   --brand-ink: #ffffff;
+diff --git a/img/plans-dark.svg b/img/plans-dark.svg
+new file mode 100644
+index 0000000..7a00ff4
+--- /dev/null
++++ b/img/plans-dark.svg
+@@ -0,0 +1,9 @@
++<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 240" width="960" height="240">
++  <rect width="960" height="240" fill="#111827"/>
++  <g font-family="Inter, system-ui, sans-serif" font-size="18" font-weight="600">
++    <g transform="translate(110 50)"><rect width="200" height="140" rx="14" fill="#1f2937" stroke="#1e3a8a" stroke-width="2"/><rect x="24" y="28" width="120" height="12" rx="6" fill="#1e40af"/><rect x="24" y="56" width="152" height="10" rx="5" fill="#1e3a8a"/><rect x="24" y="76" width="96" height="10" rx="5" fill="#1e3a8a"/><text x="24" y="120" fill="#93c5fd">Sent</text></g>
++    <g transform="translate(380 50)"><rect width="200" height="140" rx="14" fill="#1f2937" stroke="#1e3a8a" stroke-width="2"/><rect x="24" y="28" width="120" height="12" rx="6" fill="#1e40af"/><rect x="24" y="56" width="152" height="10" rx="5" fill="#1e3a8a"/><rect x="24" y="76" width="96" height="10" rx="5" fill="#1e3a8a"/><text x="24" y="120" fill="#fcd34d">Reminded</text></g>
++    <g transform="translate(650 50)"><rect width="200" height="140" rx="14" fill="#1f2937" stroke="#166534" stroke-width="2"/><rect x="24" y="28" width="120" height="12" rx="6" fill="#166534"/><rect x="24" y="56" width="152" height="10" rx="5" fill="#14532d"/><rect x="24" y="76" width="96" height="10" rx="5" fill="#14532d"/><text x="24" y="120" fill="#4ade80">Paid</text></g>
++    <path d="M322 120h46M592 120h46" stroke="#3b82f6" stroke-width="4" stroke-linecap="round"/>
++  </g>
++</svg>
+diff --git a/js/drawer.js b/js/drawer.js
+index 9695b62..9bd90e6 100644
+--- a/js/drawer.js
++++ b/js/drawer.js
+@@ -1,8 +1,6 @@
+-// Mobile navigation drawer.
+-if (window.matchMedia('(max-width: 640px)').matches) {
+-  const toggle = document.querySelector('#drawer-toggle');
+-  toggle.addEventListener('click', () => {
+-    const open = document.body.classList.toggle('drawer-open');
+-    toggle.setAttribute('aria-expanded', String(open));
+-  });
+-}
++// Mobile navigation drawer. The toggle is hidden above 640px, so it can always be wired up.
++const toggle = document.querySelector('#nav-toggle');
++toggle.addEventListener('click', () => {
++  const open = document.body.classList.toggle('drawer-open');
++  toggle.setAttribute('aria-expanded', String(open));
++});

@@ -1,0 +1,156 @@
+diff --git a/app.js b/app.js
+index 5d373cf..86323cd 100644
+--- a/app.js
++++ b/app.js
+@@ -1,8 +1,7 @@
+ 
+ (function () {
+-
+-  // the page has painted, so when it arrives it pushes the headline, the CTAs and everything
+-  // below it down the page.
++  // The hero art loads after first paint; its width/height attributes reserve the space so
++  // nothing below it shifts when it arrives.
+   const art = document.getElementById('hero-art');
+   const lazyLoad = () => {
+     requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(() => {
+diff --git a/index.html b/index.html
+index fb6e8c8..5b16db4 100644
+--- a/index.html
++++ b/index.html
+@@ -42,7 +42,7 @@
+     <section class="hero">
+       <div class="container hero-inner">
+         
+-        <img id="hero-art" class="hero-art" data-src="/img/hero.svg" alt="">
++        <img id="hero-art" class="hero-art" data-src="/img/hero.svg" width="1200" height="675" alt="">
+         <p class="eyebrow" data-i18n="hero.eyebrow">New · Funnels &amp; retention</p>
+         <h1 data-i18n="hero.title">Know what your users love — without tracking them.</h1>
+         <p class="lead" data-i18n="hero.lead">Lumen gives small teams clear, privacy-first analytics: no cookies, no consent banners, no creepy profiles. Just the numbers that matter.</p>
+@@ -143,7 +143,7 @@
+           <blockquote data-i18n="quote.text">“We replaced three tools with Lumen — and our pages got faster.”</blockquote>
+           <figcaption>
+             
+-            <img id="team-photo" class="avatar" src="/img/team.jpg" width="56" height="56" alt="Portrait of Linh Tran">
++            <img id="team-photo" class="avatar" src="/img/team.svg" width="56" height="56" alt="Portrait of Linh Tran">
+             <span><strong data-i18n="quote.name">Linh Tran</strong><br><span class="role" data-i18n="quote.role">Head of Growth, Sóng</span></span>
+           </figcaption>
+         </figure>
+diff --git a/settings.js b/settings.js
+index 8e4209d..966798f 100644
+--- a/settings.js
++++ b/settings.js
+@@ -5,9 +5,7 @@
+     event.preventDefault();
+   });
+ 
+-
+-  // line was never updated -> "TypeError: Cannot read properties of null" on every load.
+-  const save = document.querySelector('#save-btn');
++  const save = document.querySelector('#save-settings');
+   save.addEventListener('click', () => {
+     save.textContent = window.t('set.saved');
+   });
+diff --git a/styles.css b/styles.css
+index 98f6ff6..0711780 100644
+--- a/styles.css
++++ b/styles.css
+@@ -84,7 +84,7 @@ h1, h2, h3 { line-height: 1.2; }
+ 
+ /* ---------- promo ---------- */
+ .promo {
+-  width: 600px; 
++  max-width: 600px;
+   margin: 0 auto;
+   padding: 8px 16px;
+   border-radius: 0 0 12px 12px;
+@@ -106,7 +106,7 @@ h1, h2, h3 { line-height: 1.2; }
+ .brand img { display: block; }
+ .main-nav { flex: 1; display: flex; justify-content: center; }
+ 
+-.nav-links { display: flex; gap: 24px; max-width: 420px; overflow: hidden; white-space: nowrap; margin: 0; padding: 0; list-style: none; }
++.nav-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 0 24px; margin: 0; padding: 0; list-style: none; }
+ .nav-links a { display: inline-block; padding: 8px 0; color: var(--muted); font-size: 15px; font-weight: 500; text-decoration: none; white-space: nowrap; }
+ .header-actions { display: flex; align-items: center; gap: 12px; margin-left: auto; }
+ .nav-login { display: inline-block; padding: 8px 4px; color: var(--text); font-size: 15px; font-weight: 500; text-decoration: none; white-space: nowrap; }
+@@ -119,15 +119,11 @@ h1, h2, h3 { line-height: 1.2; }
+   .main-nav, .nav-login { display: none; }
+   .menu-toggle { display: inline-flex; }
+ }
+-@media (max-width: 639px) {
+-  
+-  .menu-toggle { position: absolute; right: 12px; top: 12px; }
+-}
+ 
+ /* ---------- hero ---------- */
+ .hero { padding: 48px 0 40px; text-align: center; }
+ .hero-inner { max-width: 820px; }
+-.hero-art { display: block; width: 100%; max-width: 720px; height: auto; margin: 0 auto 32px; border-radius: 16px; box-shadow: var(--shadow); }
++.hero-art { display: block; width: 100%; max-width: 720px; height: auto; aspect-ratio: 1200 / 675; margin: 0 auto 32px; border-radius: 16px; box-shadow: var(--shadow); }
+ .eyebrow {
+   display: inline-block; margin: 0 0 16px; padding: 6px 12px; border-radius: 999px;
+   background: var(--primary-soft); color: var(--primary-ink); font-size: 13px; font-weight: 600;
+@@ -136,7 +132,7 @@ h1, h2, h3 { line-height: 1.2; }
+ .lead { margin: 0 auto 28px; max-width: 640px; color: var(--muted); font-size: 18px; }
+ .hero-ctas { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
+ .hero-ctas .btn { white-space: nowrap; }
+-.hero-note { margin: 16px 0 0; font-size: 13px; color: #aaa; } 
++.hero-note { margin: 16px 0 0; font-size: 13px; color: var(--muted); }
+ 
+ /* ---------- logos ---------- */
+ .logos { padding: 8px 0 40px; text-align: center; }
+@@ -167,7 +163,6 @@ h1, h2, h3 { line-height: 1.2; }
+   border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow);
+ }
+ .plan-featured { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary), var(--shadow); }
+-#plan-business { background: #fff; } 
+ .badge {
+   position: absolute; top: -12px; right: 20px; padding: 4px 10px; border-radius: 999px;
+   background: var(--primary); color: var(--on-primary); font-size: 12px; font-weight: 700; line-height: 16px; white-space: nowrap;
+@@ -199,7 +194,7 @@ h1, h2, h3 { line-height: 1.2; }
+   background: var(--surface); color: var(--text); font: inherit; font-size: 15px;
+ }
+ 
+-#newsletter-submit { flex-shrink: 0; width: 120px; white-space: nowrap; overflow: hidden; }
++#newsletter-submit { flex-shrink: 0; min-width: 120px; }
+ .form-status { margin: 10px 0 0; color: var(--muted); font-size: 14px; }
+ 
+ /* ---------- footer ---------- */
+@@ -214,9 +209,9 @@ h1, h2, h3 { line-height: 1.2; }
+   margin-top: 40px; padding-top: 24px; border-top: 1px solid var(--border); color: var(--muted); font-size: 14px;
+ }
+ .footer-bottom p { margin: 0; }
+-.social { display: flex; gap: 6px; }
+-.social a { 
+-  display: inline-flex; width: 16px; height: 16px; color: var(--muted);
++.social { display: flex; gap: 8px; }
++.social a {
++  display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; color: var(--muted);
+ }
+ .social svg { display: block; width: 16px; height: 16px; }
+ 
+@@ -247,10 +242,9 @@ h1, h2, h3 { line-height: 1.2; }
+ .check { display: flex; align-items: center; gap: 10px; padding: 6px 0; font-size: 15px; }
+ .check input { width: 18px; height: 18px; margin: 0; accent-color: var(--primary); }
+ .form-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 12px; margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border); }
+-#save-settings { width: 84px; } 
+ .danger { background: var(--danger-soft); border-color: var(--danger-border); }
+ .danger p { margin: 0 0 16px; color: var(--muted); }
+-#danger-title { color: #7f1d1d; } 
++#danger-title { color: var(--danger-ink); }
+ .app-footer { padding-top: 8px; padding-bottom: 40px; color: var(--muted); font-size: 14px; }
+ .app-footer p { margin: 0; }
+ 
+@@ -279,13 +273,4 @@ h1, h2, h3 { line-height: 1.2; }
+   .newsletter-form { flex-direction: column; }
+   .field-row { grid-template-columns: 1fr; gap: 0; }
+   .workspace { display: none; }
+-  
+-  .badge { top: auto; bottom: 30px; left: 50%; right: auto; transform: translateX(-50%); }
+-}
+-
+-
+-@media (prefers-color-scheme: light) {
+-  .role { color: #465569; }             /* --muted is #475569 */
+ }
+-.role { font-size: 13.6px; }            /* the scale has 14px */
+-#newsletter-submit { border-radius: 15px; } /* --radius is 16px */

@@ -1,0 +1,7 @@
+`yarn check:ui` passes now in both English and German at 360px. It failed because of three separate bugs, and each fix is a one- to three-line change. Nothing is committed.
+
+1. **Script error `Cannot read properties of null (reading 'scrollIntoView')`** in `packages/excalidraw/components/MobileToolbar.tsx:164`. The code looked for `.ToolIcon--selected`, but that class was renamed to `.ToolIcon--checked` (the CHANGELOG notes the rename at line 106). The lookup found nothing and threw, so the `mobile-toolbar--ready` class was never added and the phone toolbar stayed invisible (`opacity: 0`). I changed it to `.ToolIcon--checked` and made the call safe if no tool is selected.
+2. **German "Live-Zusammenarbeit..." label was cut off** in `packages/excalidraw/components/welcome-screen/WelcomeScreen.scss`. `max-width: 8.5rem; overflow: hidden; white-space: nowrap` clipped longer translations. I removed those three lines, so long labels now wrap inside the menu item.
+3. **Undo/Redo were covering "Text" and "More tools"** in `packages/excalidraw/components/Actions.scss`. `top: 2.75rem` on `.mobile-shape-actions` pushed the Undo/Redo row down onto the toolbar. I removed it.
+
+I haven't looked at the result myself: a screenshot of the German welcome screen needed your approval, so it wasn't taken. It's worth a quick look on a phone-sized window to check that long labels like "Live-Zusammenarbeit…" wrap acceptably. I also didn't run `yarn test:update` or `yarn test:typecheck`. All three changes are small.

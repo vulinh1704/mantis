@@ -1,0 +1,7 @@
+`yarn check:ui` now passes: "check:ui passed: the first screen × 2 languages at 360px". Before the fix it reported 7 failures across English and German. They came from three bugs, and I changed three lines in three files. Nothing is committed.
+
+1. **Script error ("Cannot read properties of null (reading 'scrollIntoView')")**, in `packages/excalidraw/components/MobileToolbar.tsx:164`. The toolbar looked for the class `.ToolIcon--selected`, but that class was renamed to `.ToolIcon--checked` (the CHANGELOG notes the rename). The lookup found nothing and the page crashed. It now uses `.ToolIcon--checked`, and `?.` so it won't crash if no tool button is active.
+2. **Undo/Redo covering "Text" and "More tools"**, in `packages/excalidraw/components/Actions.scss`. A leftover `top: 2.75rem` on `.mobile-shape-actions` pushed the Undo/Redo row down by 44px, on top of the toolbar. I removed that line, so the row sits above the toolbar again.
+3. **German "Live-Zusammenarbeit..." label cut off**, in `packages/excalidraw/components/welcome-screen/WelcomeScreen.scss`. `.welcome-screen-menu-item__text` had `max-width: 8.5rem` (136px), and that label needs about 147px. Without the cap, the label gets the width of its column in the menu row, about 190px at 360px wide.
+
+I only ran `check:ui`. I didn't run `yarn test:typecheck` or `yarn test:update`, so run those before you ship if they're part of your release steps.

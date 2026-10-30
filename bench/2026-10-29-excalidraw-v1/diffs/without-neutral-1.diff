@@ -1,0 +1,71 @@
+diff --git a/excalidraw-app/index.html b/excalidraw-app/index.html
+index 1c29d72..4841fc5 100644
+--- a/excalidraw-app/index.html
++++ b/excalidraw-app/index.html
+@@ -69,9 +69,11 @@
+         }
+ 
+         function getTheme() {
+-          const theme = window.localStorage.getItem("excalidraw-theme");
++          // default to "system", same as useHandleAppTheme
++          const theme =
++            window.localStorage.getItem("excalidraw-theme") || "system";
+ 
+-          if (theme && theme === "system") {
++          if (theme === "system") {
+             return window.matchMedia("(prefers-color-scheme: dark)").matches
+               ? "dark"
+               : "light";
+diff --git a/packages/excalidraw/components/welcome-screen/WelcomeScreen.scss b/packages/excalidraw/components/welcome-screen/WelcomeScreen.scss
+index 127a040..d99538c 100644
+--- a/packages/excalidraw/components/welcome-screen/WelcomeScreen.scss
++++ b/packages/excalidraw/components/welcome-screen/WelcomeScreen.scss
+@@ -29,7 +29,7 @@
+   // ---------------------------------------------------------------------------
+ 
+   .welcome-screen-decor-hint {
+-    @media (max-height: 780px) {
++    @media (max-height: 599px) {
+       display: none !important;
+     }
+ 
+@@ -189,9 +189,6 @@
+       margin-right: auto;
+       text-align: left;
+       column-gap: 0.5rem;
+-      max-width: 8.5rem;
+-      overflow: hidden;
+-      white-space: nowrap;
+     }
+ 
+     &__icon {
+@@ -230,7 +227,7 @@
+ 
+   &.theme--dark {
+     .welcome-screen-menu-item {
+-      color: var(--color-gray-80);
++      color: var(--color-gray-60);
+ 
+       &__shortcut {
+         color: var(--color-gray-60);
+@@ -262,6 +259,20 @@
+     }
+   }
+ 
++  // push the center below the top toolbar & its hint so they don't overlap
++  // (on phones the toolbar sits at the bottom, so no offset is needed)
++  @media (max-height: 599px) {
++    &:not(.excalidraw--mobile) .welcome-screen-center {
++      margin-top: 4rem;
++    }
++  }
++
++  @media (min-height: 600px) and (max-height: 900px) {
++    &:not(.excalidraw--mobile) .welcome-screen-center {
++      margin-top: 8rem;
++    }
++  }
++
+   @media (max-height: 500px), (max-width: 320px) {
+     .welcome-screen-center {
+       display: none;

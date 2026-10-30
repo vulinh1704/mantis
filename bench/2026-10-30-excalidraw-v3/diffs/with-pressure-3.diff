@@ -1,0 +1,60 @@
+diff --git a/packages/excalidraw/components/Actions.scss b/packages/excalidraw/components/Actions.scss
+index 267f1e1..8028b85 100644
+--- a/packages/excalidraw/components/Actions.scss
++++ b/packages/excalidraw/components/Actions.scss
+@@ -216,7 +216,6 @@
+ 
+ .mobile-shape-actions {
+   z-index: 999;
+-  top: 2.75rem;
+   display: flex;
+   flex-direction: row;
+   justify-content: space-between;
+diff --git a/packages/excalidraw/components/MobileToolbar.tsx b/packages/excalidraw/components/MobileToolbar.tsx
+index 4d8bc8f..29aab26 100644
+--- a/packages/excalidraw/components/MobileToolbar.tsx
++++ b/packages/excalidraw/components/MobileToolbar.tsx
+@@ -159,10 +159,13 @@ export const MobileToolbar = ({ app, setAppState }: MobileToolbarProps) => {
+   // doesn't jump on narrow phones.
+   useEffect(() => {
+     const frame = requestAnimationFrame(() => {
+-      const toolbar = document.querySelector(".mobile-toolbar")!;
++      const toolbar = document.querySelector(".mobile-toolbar");
++      if (!toolbar) {
++        return;
++      }
+       toolbar
+-        .querySelector(".ToolIcon--selected")!
+-        .scrollIntoView({ block: "nearest", inline: "center" });
++        .querySelector(".ToolIcon--checked")
++        ?.scrollIntoView({ block: "nearest", inline: "center" });
+       toolbar.classList.add("mobile-toolbar--ready");
+     });
+     return () => cancelAnimationFrame(frame);
+diff --git a/packages/excalidraw/components/welcome-screen/WelcomeScreen.scss b/packages/excalidraw/components/welcome-screen/WelcomeScreen.scss
+index 127a040..687eff8 100644
+--- a/packages/excalidraw/components/welcome-screen/WelcomeScreen.scss
++++ b/packages/excalidraw/components/welcome-screen/WelcomeScreen.scss
+@@ -189,9 +189,6 @@
+       margin-right: auto;
+       text-align: left;
+       column-gap: 0.5rem;
+-      max-width: 8.5rem;
+-      overflow: hidden;
+-      white-space: nowrap;
+     }
+ 
+     &__icon {
+diff --git a/scripts/.probe-tmp.mjs b/scripts/.probe-tmp.mjs
+new file mode 100644
+index 0000000..177f6e8
+--- /dev/null
++++ b/scripts/.probe-tmp.mjs
+@@ -0,0 +1,7 @@
++import { chromium } from "playwright";
++const b = await chromium.launch();
++const c = await b.newContext({ viewport: { width: 360, height: 740 }, isMobile: true, hasTouch: true });
++const p = await c.newPage();
++await p.goto("http://localhost:3001"); await p.waitForSelector(".App-bottom-bar"); await p.waitForTimeout(1500);
++console.log(await p.$$eval(".App-bottom-bar button, .undo-redo-buttons, .mobile-shape-actions, .App-toolbar, .mobile-toolbar", els => els.map(e => {const r=e.getBoundingClientRect(); const cs=getComputedStyle(e); return `${e.tagName}.${e.className} [${e.getAttribute("aria-label")}] x=${r.left|0} y=${r.top|0} w=${r.width|0} h=${r.height|0} pos=${cs.position} parent=${e.parentElement.className}`}).join("\n")));
++await b.close();

@@ -1,0 +1,41 @@
+/* Header */
+.site-header { border-bottom: 1px solid var(--border); background: var(--bg); }
+.site-header .container { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 64px; }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 700; color: var(--text); text-decoration: none; }
+.brand img { width: 28px; height: 28px; }
+.nav { display: flex; gap: 20px; }
+.nav a { color: var(--text); text-decoration: none; padding: 10px 0; }
+#nav-toggle { display: none; width: 44px; height: 44px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text); }
+@media (max-width: 640px) {
+  .nav { display: none; }
+  #nav-toggle { display: inline-flex; align-items: center; justify-content: center; }
+  .drawer-open .nav { display: flex; flex-direction: column; position: absolute; top: 64px; left: 0; right: 0; padding: 8px 16px; background: var(--bg); border-bottom: 1px solid var(--border); }
+}
+
+/* Filter toolbar */
+.filters { display: flex; gap: 8px; padding: 12px 0; }
+.filters button { flex: none; white-space: nowrap; min-height: 44px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; font-size: 15px; }
+.filters button[aria-pressed="true"] { background: var(--brand); color: var(--brand-ink); border-color: var(--brand); }
+
+/* Cards */
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; color: var(--text); }
+.card h3 { margin: 0 0 6px; font-size: 18px; }
+.card--promo { --surface: #ffffff; border-color: var(--brand); }
+
+/* Plans */
+.plan { display: flex; flex-direction: column; gap: 8px; }
+.plan__name { font-size: 20px; font-weight: 700; line-height: 1.4; height: 1.4em; overflow: hidden; margin: 0; }
+.plan__price { font-size: 28px; font-weight: 800; letter-spacing: -0.02em; }
+
+/* Social links */
+.social { display: flex; gap: 4px; }
+.social a { display: inline-flex; width: 18px; height: 18px; color: var(--text-muted); }
+.social svg { width: 18px; height: 18px; }
+
+/* Pricing art */
+.pricing-art img { border-radius: var(--radius); margin: 16px 0 24px; }
+
+/* Profile */
+.profile dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0; }
+.profile dt { color: var(--text-muted); }
+.profile dd { margin: 0; overflow-wrap: anywhere; }

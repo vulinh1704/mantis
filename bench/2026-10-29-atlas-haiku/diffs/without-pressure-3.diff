@@ -1,0 +1,48 @@
+diff --git a/css/components.css b/css/components.css
+index 093993e..452ba4d 100644
+--- a/css/components.css
++++ b/css/components.css
+@@ -13,7 +13,7 @@
+ }
+ 
+ /* Filter toolbar */
+-.filters { display: flex; gap: 8px; padding: 12px 0; }
++.filters { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 0; }
+ .filters button { flex: none; white-space: nowrap; min-height: 44px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; font-size: 15px; }
+ .filters button[aria-pressed="true"] { background: var(--brand); color: var(--brand-ink); border-color: var(--brand); }
+ 
+diff --git a/css/overlays.css b/css/overlays.css
+index 08c7b3d..27297d8 100644
+--- a/css/overlays.css
++++ b/css/overlays.css
+@@ -3,7 +3,7 @@
+ .chat-bubble svg { width: 26px; height: 26px; }
+ 
+ /* Cookie notice */
+-.cookie { position: fixed; left: 0; right: 0; bottom: 0; display: flex; gap: 12px; align-items: center; justify-content: space-between; padding: 14px 16px; background: var(--text); color: var(--bg); z-index: 40; }
++.cookie { position: fixed; left: 0; right: 0; bottom: 0; display: flex; gap: 12px; align-items: center; justify-content: space-between; padding: 14px 16px; background: var(--text); color: var(--bg); z-index: 60; }
+ .cookie p { margin: 0; font-size: 14px; }
+ .cookie .btn { flex: none; }
+ @media (min-width: 900px) {
+diff --git a/css/table.css b/css/table.css
+index d4ba7ce..f92f8a7 100644
+--- a/css/table.css
++++ b/css/table.css
+@@ -1,4 +1,4 @@
+-.invoices { width: 100%; border-collapse: collapse; font-size: 15px; }
++.invoices { display: block; overflow-x: auto; width: 100%; border-collapse: collapse; font-size: 15px; }
+ .invoices th, .invoices td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+ .invoices th { font-size: 13px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; }
+ .status { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 13px; font-weight: 600; }
+diff --git a/js/drawer.js b/js/drawer.js
+index 9695b62..61c4445 100644
+--- a/js/drawer.js
++++ b/js/drawer.js
+@@ -1,6 +1,6 @@
+ // Mobile navigation drawer.
+ if (window.matchMedia('(max-width: 640px)').matches) {
+-  const toggle = document.querySelector('#drawer-toggle');
++  const toggle = document.querySelector('#nav-toggle');
+   toggle.addEventListener('click', () => {
+     const open = document.body.classList.toggle('drawer-open');
+     toggle.setAttribute('aria-expanded', String(open));
