@@ -28,7 +28,7 @@ npm test
 | `src/look.js`, `src/compare.js` | The `look` command, and the comparison with the previous run that finds cover-ups. |
 | `fixtures/buggy-app/` | A small site with planted bugs. `PLANTED.json` lists exactly what Mantis must report, and on which screens. |
 | `fixtures/clean-app/` | The same site with every bug fixed honestly. Mantis must report nothing here. |
-| `plugins/mantis/` | The Claude Code plugin: the agent skills (`skills/*/SKILL.md`) and its manifest. `skills.sh.json` points other agents' installers here. |
+| `plugins/mantis/` | The plugin: the agent skills (`skills/*/SKILL.md`) and one manifest each for Claude Code (`.claude-plugin/`) and Cursor (`.cursor-plugin/`), kept at the same version. `skills.sh.json` points other agents' installers here. |
 | `bench/` | The agent benchmarks and their harness. |
 
 ## Changing a detector
