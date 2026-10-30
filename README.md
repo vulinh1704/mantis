@@ -347,6 +347,29 @@ The file holds a live session, so keep it out of git. Inside `.mantis/` it alrea
 npx skills add vulinh1704/mantis
 ```
 
+**MCP server** (from v0.7). Any MCP client (Claude Desktop, Cursor, VS Code, Codex, Windsurf, …) can call Mantis as tools:
+
+| Tool | What it returns |
+|---|---|
+| `mantis_look` | The report and the contact sheet, with fixes and cover-ups compared with the last run |
+| `mantis_perf` | The ranked fixes and the perf sheet, with the before/after receipt |
+| `mantis_learn` | The house style and its sheet |
+| `mantis_proof` | The before/after sheet of two runs |
+
+The tools take the same options as the CLI, with progress while they run. Reports land in `.mantis/` in the server's working directory.
+
+```bash
+claude mcp add mantis -- npx -y @vulinh1704/mantis mcp
+```
+
+Other clients take the same command in their MCP settings:
+
+```json
+{ "mcpServers": { "mantis": { "command": "npx", "args": ["-y", "@vulinh1704/mantis", "mcp"] } } }
+```
+
+A look takes seconds and a perf run a minute or more, so allow a long tool timeout in your client.
+
 **Just the CLI**
 
 ```bash
