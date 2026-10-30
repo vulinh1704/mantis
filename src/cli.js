@@ -2,6 +2,7 @@ import path from 'node:path';
 import { learn } from './learn.js';
 import { BrowserError, UnreachableError, look } from './look.js';
 import { UsageError, parseLearnArgs, parseLookArgs, parsePerfArgs, parseProofArgs } from './options.js';
+import { savingLabel } from './perf/findings.js';
 import { fmtKb, fmtMs, perf } from './perf/index.js';
 import { styleCounts } from './style.js';
 import { proof } from './proof.js';
@@ -81,9 +82,13 @@ perf: load every route N times cold in Chromium, throttled like a mid-range phon
 slow 4G (or unthrottled with --profile desktop), and report the median and spread
 of LCP, FCP, TBT, CLS, TTFB, load, bytes and requests, with the LCP element, the
 slowest requests and the code that made them, the long animation frames and the
-scripts that ran in them, and the code that never ran. Writes
-<out>/perf/runs/<timestamp>/{perf.md,perf.json} plus a copy in <out>/perf/latest.
-Measure a production build: a dev server's numbers are not what users get.
+scripts that ran in them, and the code that never ran. Then it ranks fixes by
+impact and fix risk (do first, plan, nice to have, your call), each with its
+culprit (selector, URL or file:line and function), the estimated saving and the
+framework's own way to fix it. Writes <out>/perf/runs/<timestamp>/{perf.md,
+perf.json} plus a copy in <out>/perf/latest. Exit code 1 when there is something
+to do first or to plan. Measure a production build: a dev server's numbers are
+not what users get.
 
   --routes /,/settings         routes to measure (default: the URL's own path)
   --runs <n>                   cold visits per route, 1-15 (default 5)
@@ -194,6 +199,9 @@ export async function main(argv = process.argv.slice(2), { stdout = process.stdo
           const m = r.metrics;
           out(`${r.route}  LCP ${fmtMs(m.lcp?.median)} · FCP ${fmtMs(m.fcp?.median)} · TBT ${fmtMs(m.tbt?.median)} · CLS ${m.cls?.median ?? '–'} · ${fmtKb(m.bytes?.median)} in ${m.requests?.median ?? '–'} requests${r.devServer ? '  (dev server)' : ''}`);
         }
+        const s = res.report.summary;
+        out(`Fixes: ${s['do-first']} do first · ${s.plan} plan · ${s.nice} nice to have · ${s['your-call']} your call`);
+        for (const f of res.report.findings.slice(0, 3)) out(`  ${savingLabel(f).padEnd(14)} ${f.title}`);
         out(`  report  ${rel(path.join(res.latestDir, 'perf.md'))}`);
         out(`  run     ${rel(res.runDir)}`);
       }
