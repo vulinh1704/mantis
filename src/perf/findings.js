@@ -229,13 +229,21 @@ export function findRouteIssues(r, profile) {
     const onProfile = f.self * slowdown;
     const inLongFrame = (v.loafs ?? []).some((l) => l.blocking > 0 && l.scripts.some((s) => s.url === f.url));
     if (onProfile < 100 && !(onProfile >= 50 && inLongFrame)) continue;
-    const where = `${shortUrl(f.url, origin)}:${f.line}`;
+    // In a minified bundle everything is on line 1: the column finds the function.
+    const minified = f.line <= 2;
+    const where = `${shortUrl(f.url, origin)}:${f.line}${minified ? `:${f.column}` : ''}`;
+    const anonymous = f.fn === '(anonymous)';
+    // An anonymous "function" at 1:1 is the script's own top level: what it runs as it loads.
+    const topLevel = anonymous && f.line === 1 && f.column === 1;
+    const who = topLevel ? `The top-level code of ${shortUrl(f.url, origin)}` : anonymous ? `An anonymous function at ${where}` : `\`${f.fn}\``;
     add({
-      category: 'long-task', key: `${f.url}:${f.line}:${f.fn}`, metric: 'tbt', savings: { ms: Math.round(onProfile - 50) }, confidence: 'estimated',
-      title: `\`${f.fn}\` holds the main thread for about ${fmtMs(onProfile)}`,
-      culprit: { url: f.url, line: f.line, fn: f.fn },
-      evidence: `${fmtMs(f.self)} of its own time in the unthrottled profile${slowdown > 1 ? `, about ${fmtMs(onProfile)} on this profile's ${slowdown}× slower CPU` : ''}, at ${where}. The page cannot respond to taps meanwhile.`,
-      fix: `Make \`${f.fn}\` do less on the main thread: take repeated work out of loops, compute once and reuse, render only what is visible, yield between chunks (\`await scheduler.yield()\`), or move pure computation to a Web Worker.`,
+      category: 'long-task', key: `${f.url}:${f.line}:${f.column}:${f.fn}`, metric: 'tbt', savings: { ms: Math.round(onProfile - 50) }, confidence: 'estimated',
+      title: `${who} holds the main thread for about ${fmtMs(onProfile)}`,
+      culprit: { url: f.url, line: f.line, ...(minified ? { column: f.column } : {}), fn: f.fn },
+      evidence: `${fmtMs(f.self)} of its own time in the unthrottled profile${slowdown > 1 ? `, about ${fmtMs(onProfile)} on this profile's ${slowdown}× slower CPU` : ''}, at ${where}${minified ? ' (a minified bundle: open it with its source map, or measure a build with readable names)' : ''}. The page cannot respond to taps meanwhile.`,
+      fix: topLevel
+        ? 'Run less as the script loads: move setup that the first screen does not need behind the first interaction or `requestIdleCallback`, and split the bundle so this route loads less code.'
+        : `Make ${anonymous ? 'that function' : `\`${f.fn}\``} do less on the main thread: take repeated work out of loops, compute once and reuse, render only what is visible, yield between chunks (\`await scheduler.yield()\`), or move pure computation to a Web Worker.`,
       fixRisk: 'medium', riskReason: 'changes the logic of the code that does the work',
     });
   }
@@ -246,9 +254,10 @@ export function findRouteIssues(r, profile) {
     const transfer = reqByUrl.get(c.url)?.bytes ?? c.total;
     const kb = Math.round(((c.unused / c.total) * transfer) / 1024);
     const js = c.type === 'js';
+    const share = Math.round((c.unused / c.total) * 100);
     add({
-      category: 'unused-code', key: c.url, metric: 'bytes', savings: { kb }, confidence: 'measured',
-      title: `${Math.round((c.unused / c.total) * 100)}% of ${shortUrl(c.url, origin)} never runs on this page`,
+      category: js ? 'unused-code' : 'unused-css', key: c.url, metric: 'bytes', savings: { kb }, confidence: 'measured',
+      title: js ? `${share}% of ${shortUrl(c.url, origin)} never runs on this page` : `${share}% of the CSS in ${shortUrl(c.url, origin)} matches nothing on this page`,
       culprit: { url: c.url },
       evidence: `${fmtKb(c.unused)} of ${fmtKb(c.total)} ${js ? 'of code never ran' : 'of CSS rules matched nothing'} (Chromium coverage, until the page was quiet).`,
       fix: js ? 'Split it: ship what this route runs and load the rest with a dynamic `import()` where it is needed.' : 'Remove unused rules (Tailwind `content`, PurgeCSS) or split the CSS per route.',
@@ -256,21 +265,31 @@ export function findRouteIssues(r, profile) {
     });
   }
 
-  // Web fonts that hide text until they arrive.
+  // Web fonts that hide text until they arrive. A file is tied to its font-display through the
+  // @font-face rules the page can read; files from stylesheets it can't read (cross-origin) count
+  // only when every loaded font face hides text.
   const fontReqs = v.requests.filter((q) => q.type === 'Font' && q.end != null);
-  const hiding = (v.fonts ?? []).filter((f) => f.status === 'loaded' && (f.display === 'auto' || f.display === 'block'));
-  if (fontReqs.length && hiding.length) {
-    // With block or auto, text that uses the font is invisible from the font's request until it arrives (at most 3 s).
-    const firstFont = Math.min(...fontReqs.map((q) => q.start));
-    const lastFont = Math.max(...fontReqs.map((q) => q.end));
+  const rules = v.fontRules ?? [];
+  const hidesText = (d) => d === 'auto' || d === 'block';
+  const ruleOf = (q) => rules.find((r) => r.urls.includes(q.url));
+  const faces = (v.fonts ?? []).filter((f) => f.status === 'loaded');
+  const allHide = faces.length > 0 && faces.every((f) => hidesText(f.display));
+  const hidingReqs = fontReqs.filter((q) => (ruleOf(q) ? hidesText(ruleOf(q).display) : allHide));
+  if (hidingReqs.length) {
+    // With block or auto, text in the font is invisible from the font's request until it arrives (at most 3 s).
+    const firstFont = Math.min(...hidingReqs.map((q) => q.start));
+    const lastFont = Math.max(...hidingReqs.map((q) => q.end));
     const hidden = Math.round(Math.min(3000, Math.max(0, lastFont - firstFont)));
     const textLcp = e && e.tag !== 'img' && !e.url;
+    const families = [...new Set(hidingReqs.map((q) => ruleOf(q)?.family).filter(Boolean))];
+    const names = families.length ? families : [...new Set(faces.map((f) => f.family))];
+    const display = ruleOf(hidingReqs[0])?.display ?? faces[0]?.display ?? 'auto';
     if (hidden >= 50) add({
-      category: 'font', key: hiding.map((f) => f.family).sort().join(','), metric: textLcp ? 'lcp' : 'fcp',
+      category: 'font', key: names.slice().sort().join(','), metric: textLcp ? 'lcp' : 'fcp',
       savings: { ms: hidden }, confidence: 'heuristic',
-      title: `Text stays invisible until the web font arrives: ${[...new Set(hiding.map((f) => f.family))].join(', ')}`,
-      culprit: { url: fontReqs[0].url },
-      evidence: `font-display is ${hiding[0].display}: text in it is hidden from ${fmtMs(firstFont)}, when the font is requested, until ${fmtMs(lastFont)}, when the last font file arrives.`,
+      title: `Text stays invisible until the web font arrives: ${names.slice(0, 3).join(', ')}${names.length > 3 ? ', …' : ''}`,
+      culprit: { url: hidingReqs[0].url },
+      evidence: `font-display is ${display}: text in it is hidden from ${fmtMs(firstFont)}, when the font is requested, until ${fmtMs(lastFont)}, when ${hidingReqs.length === 1 ? 'it arrives' : `the last of its ${hidingReqs.length} files arrives`}.`,
       fix: 'Add `font-display: swap` to each @font-face (or `optional`, which never shifts the layout) and preload the one font the first screen uses.',
       fixRisk: 'low', riskReason: 'text shows in the fallback font for a moment',
     });

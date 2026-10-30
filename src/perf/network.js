@@ -217,7 +217,9 @@ export function networkChecks(r, profile, add) {
     const blocking = vd.requests.filter((q) => q.renderBlocking && q.end != null && fcp != null && q.start < fcp);
     const held = blocking.length ? Math.round(Math.max(0, Math.min(Math.max(...blocking.map((q) => q.end)), fcp) - docEnd)) : 0;
     if (main < 50 && bytes < 50 * 1024 && held < 50 && !vd.iframes.length) continue;
-    const kind = vd.category === 'other' ? 'third party' : vd.category.replace('-', ' ');
+    // An unknown host that only serves fonts is a font host, whoever runs it.
+    const category = vd.category === 'other' && vd.requests.length && vd.requests.every((q) => q.type === 'Font') ? 'fonts' : vd.category;
+    const kind = category === 'other' ? 'third party' : category.replace('-', ' ');
     const script = vd.requests.find((q) => q.type === 'Script') ?? vd.requests[0];
     const metric = held >= 50 ? 'fcp' : main >= 50 ? 'tbt' : 'bytes';
     const savings = metric === 'fcp' ? { ms: held } : metric === 'tbt' ? { ms: main - 50 } : { kb: Math.round(bytes / 1024) };
@@ -228,9 +230,9 @@ export function networkChecks(r, profile, add) {
       category: 'third-party', key: vd.id, metric, savings, confidence: 'estimated',
       title: `${vd.name} (${kind}): ${parts.join(', ') || 'an embedded iframe'}`,
       culprit, evidence,
-      fix: VENDOR_FIX[vd.category] ?? VENDOR_FIX.other,
-      fixRisk: 'medium', riskReason: `loading it later delays what it does${vd.category === 'chat' ? ' (the chat opens a moment later)' : vd.category === 'analytics' || vd.category === 'ads' ? ' (early bounces may go untracked)' : ''}`,
-      vendor: { name: vd.name, category: vd.category, requests: vd.requests.length, bytes, mainThreadMs: main },
+      fix: VENDOR_FIX[category] ?? VENDOR_FIX.other,
+      fixRisk: 'medium', riskReason: category === 'fonts' ? 'the files move to your own host' : `loading it later delays what it does${category === 'chat' ? ' (the chat opens a moment later)' : category === 'analytics' || category === 'ads' ? ' (early bounces may go untracked)' : ''}`,
+      vendor: { name: vd.name, category, requests: vd.requests.length, bytes, mainThreadMs: main },
     });
     if (main >= 250 || bytes >= 300 * 1024) {
       add({
