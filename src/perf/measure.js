@@ -323,6 +323,18 @@ function collectInPage() {
 }
 
 /**
+ * Wait until the images on the first screen have loaded (lazy ones don't hold the load event, and a
+ * slow one can arrive after the network looked quiet), then two frames, so their LCP entry is in.
+ */
+async function settleImages(page, timeout) {
+  await page.waitForFunction(() => [...document.images].every((img) => {
+    const r = img.getBoundingClientRect();
+    return img.complete || !(r.bottom > 0 && r.top < innerHeight && r.width > 0);
+  }), null, { timeout: Math.min(timeout, 10000), polling: 200 }).catch(() => {});
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))).catch(() => {});
+}
+
+/**
  * Measure one cold visit.
  * @param {import('playwright').Browser} browser
  * @param {string} url
@@ -354,6 +366,7 @@ export async function measureVisit(browser, url, profile, { storageState = null,
       // keep what loaded; a page that never goes quiet is measured as it is
     }
     await page.waitForTimeout(1500); // late LCP candidates and long tasks after load
+    await settleImages(page, timeout);
     if (profile.cpuSlowdown > 1) await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
     await page.evaluate(installMantisLib, { ignore: [] });
     const data = await page.evaluate(collectInPage);
