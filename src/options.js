@@ -197,6 +197,24 @@ export function routeSlug(route) {
   return s || 'home';
 }
 
+/** The <url> positional (bare localhost gets http://) and --routes (default: the URL's own path). */
+function parseTarget(positionals, routesValue, command) {
+  if (positionals.length === 0) throw new UsageError(`missing <url> (e.g. mantis ${command} http://localhost:3000)`);
+  if (positionals.length > 1) throw new UsageError(`unexpected argument "${positionals[1]}"`);
+  let raw = positionals[0];
+  if (/^(localhost|127\.0\.0\.1|\[::1\]|0\.0\.0\.0)(:\d+)?(\/|$)/i.test(raw)) raw = `http://${raw}`;
+  let baseUrl;
+  try {
+    baseUrl = new URL(raw);
+  } catch {
+    throw new UsageError(`invalid URL "${positionals[0]}"`);
+  }
+  if (!/^https?:$/.test(baseUrl.protocol)) throw new UsageError(`only http(s) URLs are supported (got ${baseUrl.protocol})`);
+  const routes = routesValue !== undefined ? normalizeRoutes(splitList(routesValue), baseUrl) : [baseUrl.pathname + baseUrl.search];
+  if (routes.length === 0) throw new UsageError('--routes is empty');
+  return { baseUrl, routes };
+}
+
 function parseIntOpt(name, value, min, max) {
   if (value === undefined) return undefined;
   if (!/^\d+$/.test(String(value))) throw new UsageError(`--${name} must be a whole number (got "${value}")`);
@@ -276,23 +294,7 @@ export function parseLookArgs(argv) {
     throw new UsageError(err.message);
   }
   const { values, positionals } = parsed;
-  if (positionals.length === 0) throw new UsageError('missing <url> (e.g. mantis look http://localhost:3000)');
-  if (positionals.length > 1) throw new UsageError(`unexpected argument "${positionals[1]}"`);
-
-  let raw = positionals[0];
-  if (/^(localhost|127\.0\.0\.1|\[::1\]|0\.0\.0\.0)(:\d+)?(\/|$)/i.test(raw)) raw = `http://${raw}`;
-  let baseUrl;
-  try {
-    baseUrl = new URL(raw);
-  } catch {
-    throw new UsageError(`invalid URL "${positionals[0]}"`);
-  }
-  if (!/^https?:$/.test(baseUrl.protocol)) throw new UsageError(`only http(s) URLs are supported (got ${baseUrl.protocol})`);
-
-  const routes = values.routes !== undefined
-    ? normalizeRoutes(splitList(values.routes), baseUrl)
-    : [baseUrl.pathname + baseUrl.search];
-  if (routes.length === 0) throw new UsageError('--routes is empty');
+  const { baseUrl, routes } = parseTarget(positionals, values.routes, 'look');
 
   const viewportTokens = values.viewports !== undefined ? splitList(values.viewports) : LOOK_DEFAULTS.viewports;
   if (viewportTokens.length === 0) throw new UsageError('--viewports is empty');
@@ -498,5 +500,60 @@ export function parseProofArgs(argv) {
     darkStrategy: parseDarkStrategy(v['dark-strategy'] ?? 'media'),
     videoOut: out.replace(/\.png$/i, '.mp4'),
     storageState: parseStorageStatePath(v['storage-state']),
+  };
+}
+
+/**
+ * @typedef {object} PerfOptions
+ * @property {string} url
+ * @property {URL} baseUrl
+ * @property {string[]} routes
+ * @property {number} runs  measured cold visits per route (the median is reported)
+ * @property {'mobile'|'desktop'} profile
+ * @property {string} out
+ * @property {boolean} json
+ * @property {number} timeout
+ * @property {string|null} storageState
+ */
+
+/**
+ * Parse `mantis perf` arguments.
+ * @param {string[]} argv
+ * @returns {PerfOptions}
+ */
+export function parsePerfArgs(argv) {
+  let parsed;
+  try {
+    parsed = parseArgs({
+      args: argv,
+      allowPositionals: true,
+      strict: true,
+      options: {
+        routes: { type: 'string' },
+        runs: { type: 'string' },
+        profile: { type: 'string' },
+        out: { type: 'string' },
+        json: { type: 'boolean' },
+        timeout: { type: 'string' },
+        'storage-state': { type: 'string' },
+      },
+    });
+  } catch (err) {
+    throw new UsageError(err.message);
+  }
+  const { values, positionals } = parsed;
+  const { baseUrl, routes } = parseTarget(positionals, values.routes, 'perf');
+  const profile = values.profile ?? 'mobile';
+  if (profile !== 'mobile' && profile !== 'desktop') throw new UsageError(`unknown --profile "${profile}" (use mobile or desktop)`);
+  return {
+    url: baseUrl.href,
+    baseUrl,
+    routes,
+    runs: parseIntOpt('runs', values.runs, 1, 15) ?? 5,
+    profile,
+    out: values.out ?? LOOK_DEFAULTS.out,
+    json: Boolean(values.json),
+    timeout: parseIntOpt('timeout', values.timeout, 1000, 600000) ?? 60000,
+    storageState: parseStorageStatePath(values['storage-state']),
   };
 }
