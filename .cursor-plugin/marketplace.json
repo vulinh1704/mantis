@@ -1,0 +1,16 @@
+{
+  "name": "mantis",
+  "owner": {
+    "name": "Truong Dang Vu Linh"
+  },
+  "metadata": {
+    "description": "Catches the UI bugs your coding agent can't see, and the ones it hides."
+  },
+  "plugins": [
+    {
+      "name": "mantis",
+      "source": "plugins/mantis",
+      "description": "Look at the UI before calling it done: every screen, theme and language, fixed at the root, with before/after proof."
+    }
+  ]
+}
