@@ -1,0 +1,44 @@
+name: False positive
+description: Mantis reported something that works fine.
+labels: ["false positive"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks. False positives cost every user time, so they get fixed first.
+        Mantis's own fixtures can't catch them; only real pages can.
+  - type: input
+    id: version
+    attributes:
+      label: Mantis version
+      description: "`mantis --version`, or the tag you ran with npx."
+      placeholder: "0.4.0"
+    validations:
+      required: true
+  - type: input
+    id: command
+    attributes:
+      label: Command
+      placeholder: "mantis look http://localhost:3000 --routes /pricing --locales en,de"
+    validations:
+      required: true
+  - type: textarea
+    id: finding
+    attributes:
+      label: What Mantis reported
+      description: Paste the issue from `.mantis/latest/report.md`, with its selector and the screens it lists.
+      render: markdown
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why it isn't a bug
+      description: What you see on that screen, and what Mantis got wrong. A cropped screenshot helps.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: How to reproduce
+      description: A public URL, or a minimal HTML page that triggers it.

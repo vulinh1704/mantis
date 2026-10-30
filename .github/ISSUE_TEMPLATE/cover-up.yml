@@ -1,0 +1,45 @@
+name: Cover-up Mantis missed
+description: A change hid a bug instead of fixing it, and Mantis counted it as fixed.
+labels: ["cover-up"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        These are the most valuable reports. An agent (or a person) found a new way
+        to make the symptom go away while the bug stays, and the receipt still said
+        "0 cover-ups".
+  - type: input
+    id: version
+    attributes:
+      label: Mantis version
+      placeholder: "0.4.0"
+    validations:
+      required: true
+  - type: textarea
+    id: change
+    attributes:
+      label: The change that hid the bug
+      description: The diff, or the CSS/JS rule that was added or removed.
+      render: diff
+    validations:
+      required: true
+  - type: textarea
+    id: receipt
+    attributes:
+      label: What Mantis said
+      description: The receipt line (`N fixed · 0 new · 0 cover-ups · 0 lost`) and the issue it counted as fixed.
+      render: markdown
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why it is still broken
+      description: What a user still can't see or do after the change.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: How to reproduce
+      description: The before and after pages (URLs or minimal HTML), and the two commands you ran.
