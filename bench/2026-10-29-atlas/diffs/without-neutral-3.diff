@@ -1,0 +1,135 @@
+diff --git a/account.html b/account.html
+index 2b92929..8a066f3 100644
+--- a/account.html
++++ b/account.html
+@@ -29,8 +29,9 @@
+ 
+   <main>
+     <div class="container">
+-      <h1 data-i18n="account.title">Your invoices</h1>
++      <h1 id="invoices-heading" data-i18n="account.title">Your invoices</h1>
+       <p class="lead" data-i18n="account.lead">Everything you have billed this quarter.</p>
++      <div class="table-scroll" role="region" aria-labelledby="invoices-heading" tabindex="0">
+       <table class="invoices">
+         <thead>
+           <tr>
+@@ -43,6 +44,7 @@
+         </thead>
+         <tbody id="invoice-rows"></tbody>
+       </table>
++      </div>
+       <p class="caption" data-i18n="caption.updated">Updated 2 minutes ago · Figures in USD</p>
+ 
+       <section class="card profile" id="profile">
+diff --git a/css/components.css b/css/components.css
+index 093993e..8511190 100644
+--- a/css/components.css
++++ b/css/components.css
+@@ -1,5 +1,5 @@
+ /* Header */
+-.site-header { border-bottom: 1px solid var(--border); background: var(--bg); }
++.site-header { position: relative; z-index: 30; border-bottom: 1px solid var(--border); background: var(--bg); }
+ .site-header .container { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 64px; }
+ .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; color: var(--text); text-decoration: none; }
+ .brand img { width: 28px; height: 28px; }
+@@ -13,23 +13,23 @@
+ }
+ 
+ /* Filter toolbar */
+-.filters { display: flex; gap: 8px; padding: 12px 0; }
++.filters { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 0; }
+ .filters button { flex: none; white-space: nowrap; min-height: 44px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; font-size: 15px; }
+ .filters button[aria-pressed="true"] { background: var(--brand); color: var(--brand-ink); border-color: var(--brand); }
+ 
+ /* Cards */
+ .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; color: var(--text); }
+ .card h3 { margin: 0 0 6px; font-size: 18px; }
+-.card--promo { --surface: #ffffff; border-color: var(--brand); }
++.card--promo { border-color: var(--brand); }
+ 
+ /* Plans */
+ .plan { display: flex; flex-direction: column; gap: 8px; }
+-.plan__name { font-size: 20px; font-weight: 700; line-height: 1.4; height: 1.4em; overflow: hidden; margin: 0; }
++.plan__name { font-size: 20px; font-weight: 700; line-height: 1.4; margin: 0; }
+ .plan__price { font-size: 28px; font-weight: 800; letter-spacing: -0.02em; }
+ 
+ /* Social links */
+ .social { display: flex; gap: 4px; }
+-.social a { display: inline-flex; width: 18px; height: 18px; color: var(--text-muted); }
++.social a { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; color: var(--text-muted); }
+ .social svg { width: 18px; height: 18px; }
+ 
+ /* Pricing art */
+diff --git a/css/overlays.css b/css/overlays.css
+index 08c7b3d..ce9d145 100644
+--- a/css/overlays.css
++++ b/css/overlays.css
+@@ -6,6 +6,10 @@
+ .cookie { position: fixed; left: 0; right: 0; bottom: 0; display: flex; gap: 12px; align-items: center; justify-content: space-between; padding: 14px 16px; background: var(--text); color: var(--bg); z-index: 40; }
+ .cookie p { margin: 0; font-size: 14px; }
+ .cookie .btn { flex: none; }
++/* Keep the Accept button clear of the chat bubble (16px + 56px + 16px gap). */
++@media (max-width: 899px) {
++  .cookie { padding-right: 88px; }
++}
+ @media (min-width: 900px) {
+   .cookie { left: 24px; right: auto; bottom: 24px; max-width: 460px; border-radius: 12px; }
+ }
+diff --git a/css/table.css b/css/table.css
+index d4ba7ce..bd1c6ae 100644
+--- a/css/table.css
++++ b/css/table.css
+@@ -1,5 +1,7 @@
++.table-scroll { overflow-x: auto; margin: 0 -16px 12px; padding: 0 16px; }
+ .invoices { width: 100%; border-collapse: collapse; font-size: 15px; }
+ .invoices th, .invoices td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; }
++.invoices td.customer { white-space: normal; min-width: 10em; }
+ .invoices th { font-size: 13px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; }
+ .status { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 13px; font-weight: 600; }
+ .status--paid { color: var(--ok); border: 1px solid var(--ok); }
+diff --git a/css/tokens.css b/css/tokens.css
+index 5976a73..098b605 100644
+--- a/css/tokens.css
++++ b/css/tokens.css
+@@ -3,7 +3,7 @@
+   --bg: #ffffff;
+   --surface: #f8fafc;
+   --text: #0f172a;
+-  --text-muted: #a1a1aa;
++  --text-muted: #64748b;
+   --border: #e2e8f0;
+   --brand: #2563eb;
+   --brand-ink: #ffffff;
+diff --git a/img/plans-dark.svg b/img/plans-dark.svg
+new file mode 100644
+index 0000000..bf77c89
+--- /dev/null
++++ b/img/plans-dark.svg
+@@ -0,0 +1,9 @@
++<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 240" width="960" height="240">
++  <rect width="960" height="240" fill="#111827"/>
++  <g font-family="Inter, system-ui, sans-serif" font-size="18" font-weight="600">
++    <g transform="translate(110 50)"><rect width="200" height="140" rx="14" fill="#0b1120" stroke="#1e40af" stroke-width="2"/><rect x="24" y="28" width="120" height="12" rx="6" fill="#1e3a8a"/><rect x="24" y="56" width="152" height="10" rx="5" fill="#1e293b"/><rect x="24" y="76" width="96" height="10" rx="5" fill="#1e293b"/><text x="24" y="120" fill="#93c5fd">Sent</text></g>
++    <g transform="translate(380 50)"><rect width="200" height="140" rx="14" fill="#0b1120" stroke="#1e40af" stroke-width="2"/><rect x="24" y="28" width="120" height="12" rx="6" fill="#1e3a8a"/><rect x="24" y="56" width="152" height="10" rx="5" fill="#1e293b"/><rect x="24" y="76" width="96" height="10" rx="5" fill="#1e293b"/><text x="24" y="120" fill="#fbbf24">Reminded</text></g>
++    <g transform="translate(650 50)"><rect width="200" height="140" rx="14" fill="#0b1120" stroke="#166534" stroke-width="2"/><rect x="24" y="28" width="120" height="12" rx="6" fill="#14532d"/><rect x="24" y="56" width="152" height="10" rx="5" fill="#1e293b"/><rect x="24" y="76" width="96" height="10" rx="5" fill="#1e293b"/><text x="24" y="120" fill="#4ade80">Paid</text></g>
++    <path d="M322 120h46M592 120h46" stroke="#3b82f6" stroke-width="4" stroke-linecap="round"/>
++  </g>
++</svg>
+diff --git a/js/drawer.js b/js/drawer.js
+index 9695b62..01cd7b2 100644
+--- a/js/drawer.js
++++ b/js/drawer.js
+@@ -1,8 +1,8 @@
+-// Mobile navigation drawer.
+-if (window.matchMedia('(max-width: 640px)').matches) {
+-  const toggle = document.querySelector('#drawer-toggle');
+-  toggle.addEventListener('click', () => {
++// Mobile navigation drawer. The toggle is only visible below 640px (see components.css).
++const navToggle = document.querySelector('#nav-toggle');
++if (navToggle) {
++  navToggle.addEventListener('click', () => {
+     const open = document.body.classList.toggle('drawer-open');
+-    toggle.setAttribute('aria-expanded', String(open));
++    navToggle.setAttribute('aria-expanded', String(open));
+   });
+ }

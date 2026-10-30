@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Atlas · Dashboard</title>
+  <link rel="icon" href="img/logo.svg">
+  <link rel="stylesheet" href="css/tokens.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/table.css">
+  <link rel="stylesheet" href="css/overlays.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container">
+      <a class="brand" href="/"><img src="img/logo.svg" alt="" width="28" height="28">Atlas</a>
+      <nav class="nav" id="site-nav">
+        <a href="/" data-i18n="nav.dashboard">Dashboard</a>
+        <a href="/account.html" data-i18n="nav.invoices">Invoices</a>
+        <a href="/pricing.html" data-i18n="nav.pricing">Pricing</a>
+        <a href="/account.html#profile" data-i18n="nav.account">Account</a>
+      </nav>
+      <button id="nav-toggle" type="button" aria-controls="site-nav" aria-expanded="false" aria-label="Open menu" data-i18n-aria="nav.menu">
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main>
+    <div class="container">
+      <h1 data-i18n="hero.title">Get paid on time, every time.</h1>
+      <p class="lead" data-i18n="hero.lead">Atlas sends invoices, chases late payments and reconciles your bank feed.</p>
+      <a class="btn" href="/account.html" data-i18n="hero.cta">Create an invoice</a>
+
+      <h2 data-i18n="invoices.title">Invoices</h2>
+      <div class="filters" role="toolbar" aria-label="Filter invoices">
+        <button type="button" aria-pressed="true" data-i18n="filters.all">All</button>
+        <button type="button" aria-pressed="false" data-i18n="filters.paid">Paid</button>
+        <button type="button" aria-pressed="false" data-i18n="filters.overdue">Overdue</button>
+        <button type="button" aria-pressed="false" data-i18n="filters.drafts">Drafts</button>
+      </div>
+
+      <div class="grid">
+        <article class="card">
+          <h3 data-i18n="cards.sent.title">Sent this month</h3>
+          <p data-i18n="cards.sent.body">128 invoices, 96% opened.</p>
+        </article>
+        <article class="card">
+          <h3 data-i18n="cards.late.title">Late payments</h3>
+          <p data-i18n="cards.late.body">7 invoices are more than 14 days late.</p>
+        </article>
+        <article class="card card--promo" id="promo">
+          <h3 data-i18n="cards.promo.title">Switch to annual billing</h3>
+          <p data-i18n="cards.promo.body">Pay yearly and get two months free.</p>
+          <a class="btn btn--ghost" href="/pricing.html" data-i18n="cards.promo.cta">See plans</a>
+        </article>
+      </div>
+      <p class="caption" data-i18n="caption.updated">Updated 2 minutes ago · Figures in USD</p>
+    </div>
+  </main>
+
+  <footer>
+    <div class="container">
+      <p class="caption" data-i18n="footer.copy">© 2026 Atlas Billing, Inc.</p>
+      <div class="social">
+        <a href="https://github.com/" aria-label="GitHub"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a10 10 0 0 0-3.2 19.5c.5.1.7-.2.7-.5v-1.7c-2.8.6-3.4-1.3-3.4-1.3-.4-1.2-1.1-1.5-1.1-1.5-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.5 2.4 1.1 2.9.8.1-.6.4-1.1.6-1.3-2.2-.3-4.6-1.1-4.6-5 0-1.1.4-2 1-2.7-.1-.3-.4-1.3.1-2.7 0 0 .8-.3 2.8 1a9.6 9.6 0 0 1 5 0c1.9-1.3 2.8-1 2.8-1 .5 1.4.2 2.4.1 2.7.6.7 1 1.6 1 2.7 0 3.9-2.3 4.7-4.6 5 .4.3.7.9.7 1.9V21c0 .3.2.6.7.5A10 10 0 0 0 12 2z"/></svg></a>
+        <a href="https://www.linkedin.com/" aria-label="LinkedIn"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M4.98 3.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5zM3 9.5h4V21H3zM9.5 9.5h3.8v1.6h.1c.5-1 1.8-2 3.8-2 4 0 4.8 2.6 4.8 6V21h-4v-5.2c0-1.2 0-2.8-1.7-2.8s-2 1.3-2 2.7V21h-4z"/></svg></a>
+        <a href="https://x.com/" aria-label="X"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M17.7 3h3.1l-6.8 7.8L22 21h-6.3l-4.9-6.4L5.2 21H2.1l7.3-8.3L1.8 3h6.4l4.4 5.9zm-1.1 16.2h1.7L7.5 4.7H5.7z"/></svg></a>
+      </div>
+    </div>
+  </footer>
+
+  <div class="cookie" role="region" aria-label="Cookies">
+    <p data-i18n="cookie.text">We use cookies to keep you signed in.</p>
+    <button class="btn" type="button" data-i18n="cookie.accept">Accept</button>
+  </div>
+  <button class="chat-bubble" type="button" aria-label="Chat with support" data-i18n-aria="chat.label">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M4 4h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-5 4v-4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/></svg>
+  </button>
+
+  <script src="js/i18n.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/drawer.js"></script>
+</body>
+</html>

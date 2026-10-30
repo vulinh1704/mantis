@@ -1,0 +1,49 @@
+diff --git a/packages/excalidraw/components/welcome-screen/WelcomeScreen.scss b/packages/excalidraw/components/welcome-screen/WelcomeScreen.scss
+index 127a040..817486e 100644
+--- a/packages/excalidraw/components/welcome-screen/WelcomeScreen.scss
++++ b/packages/excalidraw/components/welcome-screen/WelcomeScreen.scss
+@@ -29,7 +29,7 @@
+   // ---------------------------------------------------------------------------
+ 
+   .welcome-screen-decor-hint {
+-    @media (max-height: 780px) {
++    @media (max-height: 599px) {
+       display: none !important;
+     }
+ 
+@@ -148,7 +148,6 @@
+   .welcome-screen-center__heading {
+     font-size: 1.125rem;
+     text-align: center;
+-    line-height: 1.35rem;
+   }
+ 
+   .welcome-screen-menu {
+@@ -168,7 +167,7 @@
+     font-size: 0.875rem;
+ 
+     width: 100%;
+-    min-width: 300px;
++    min-width: min(300px, 100%);
+     max-width: 400px;
+     display: grid;
+     align-items: center;
+@@ -189,9 +188,6 @@
+       margin-right: auto;
+       text-align: left;
+       column-gap: 0.5rem;
+-      max-width: 8.5rem;
+-      overflow: hidden;
+-      white-space: nowrap;
+     }
+ 
+     &__icon {
+@@ -230,7 +226,7 @@
+ 
+   &.theme--dark {
+     .welcome-screen-menu-item {
+-      color: var(--color-gray-80);
++      color: var(--color-gray-60);
+ 
+       &__shortcut {
+         color: var(--color-gray-60);

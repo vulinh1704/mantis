@@ -1,0 +1,175 @@
+diff --git a/packages/excalidraw/components/Actions.scss b/packages/excalidraw/components/Actions.scss
+index 267f1e1..954d0b5 100644
+--- a/packages/excalidraw/components/Actions.scss
++++ b/packages/excalidraw/components/Actions.scss
+@@ -1,6 +1,6 @@
+ .zoom-actions,
+ .undo-redo-buttons {
+-  background-color: #ececf4;
++  background-color: var(--color-surface-low);
+   border-radius: var(--border-radius-lg);
+   box-shadow: 0 0 0 1px var(--color-surface-lowest);
+ }
+@@ -216,7 +216,6 @@
+ 
+ .mobile-shape-actions {
+   z-index: 999;
+-  top: 2.75rem;
+   display: flex;
+   flex-direction: row;
+   justify-content: space-between;
+diff --git a/packages/excalidraw/components/HintViewer.scss b/packages/excalidraw/components/HintViewer.scss
+index b363fe1..140ec13 100644
+--- a/packages/excalidraw/components/HintViewer.scss
++++ b/packages/excalidraw/components/HintViewer.scss
+@@ -17,7 +17,7 @@ $wide-viewport-width: 1000px;
+     width: 100%;
+     margin-top: 0.5rem;
+     text-align: center;
+-    color: var(--color-gray-40);
++    color: var(--color-gray-70);
+     font-size: 0.75rem;
+ 
+     @include isMobile {
+@@ -42,9 +42,9 @@ $wide-viewport-width: 1000px;
+ 
+   &.theme--dark {
+     .HintViewer {
+-      color: var(--color-gray-60);
++      color: var(--color-gray-50);
+       kbd {
+-        border-color: var(--color-gray-60);
++        border-color: var(--color-gray-50);
+       }
+     }
+   }
+diff --git a/packages/excalidraw/components/MobileToolbar.tsx b/packages/excalidraw/components/MobileToolbar.tsx
+index 4d8bc8f..bd24168 100644
+--- a/packages/excalidraw/components/MobileToolbar.tsx
++++ b/packages/excalidraw/components/MobileToolbar.tsx
+@@ -1,4 +1,4 @@
+-import { useState, useEffect } from "react";
++import { useState, useEffect, useRef } from "react";
+ import clsx from "clsx";
+ 
+ import { KEYS, capitalizeString } from "@excalidraw/common";
+@@ -155,14 +155,19 @@ export const MobileToolbar = ({ app, setAppState }: MobileToolbarProps) => {
+ 
+   const toolProps = { app, activeTool };
+ 
++  const toolbarRef = useRef<HTMLDivElement | null>(null);
++
+   // Fade the toolbar in once the active tool has been scrolled into view, so it
+   // doesn't jump on narrow phones.
+   useEffect(() => {
+     const frame = requestAnimationFrame(() => {
+-      const toolbar = document.querySelector(".mobile-toolbar")!;
++      const toolbar = toolbarRef.current;
++      if (!toolbar) {
++        return;
++      }
+       toolbar
+-        .querySelector(".ToolIcon--selected")!
+-        .scrollIntoView({ block: "nearest", inline: "center" });
++        .querySelector(".ToolIcon--checked")
++        ?.scrollIntoView?.({ block: "nearest", inline: "center" });
+       toolbar.classList.add("mobile-toolbar--ready");
+     });
+     return () => cancelAnimationFrame(frame);
+@@ -172,6 +177,7 @@ export const MobileToolbar = ({ app, setAppState }: MobileToolbarProps) => {
+     <div
+       className="mobile-toolbar"
+       ref={(div) => {
++        toolbarRef.current = div;
+         if (div) {
+           setToolbarWidth(div.getBoundingClientRect().width);
+         }
+diff --git a/packages/excalidraw/components/Toolbar.tsx b/packages/excalidraw/components/Toolbar.tsx
+index 7ac5678..3507672 100644
+--- a/packages/excalidraw/components/Toolbar.tsx
++++ b/packages/excalidraw/components/Toolbar.tsx
+@@ -259,7 +259,7 @@ export const Toolbar = ({
+         app={app}
+       />
+       {heading}
+-      <Stack.Row gap={isCompactStylesPanel ? 3 : 1}>
++      <Stack.Row gap={isCompactStylesPanel ? 0.5 : 1}>
+         {/* in compact UI the pen mode button is rendered as a separate
+             floating button below the compact actions menu */}
+         {!isCompactStylesPanel && (
+diff --git a/packages/excalidraw/components/live-collaboration/LiveCollaborationTrigger.scss b/packages/excalidraw/components/live-collaboration/LiveCollaborationTrigger.scss
+index cfa96ca..4c9d7b2 100644
+--- a/packages/excalidraw/components/live-collaboration/LiveCollaborationTrigger.scss
++++ b/packages/excalidraw/components/live-collaboration/LiveCollaborationTrigger.scss
+@@ -2,7 +2,7 @@
+ 
+ .excalidraw {
+   .collab-button {
+-    --button-bg: var(--color-primary-light);
++    --button-bg: var(--color-primary);
+     --button-color: var(--color-surface-lowest);
+     --button-border: var(--color-primary);
+ 
+diff --git a/packages/excalidraw/components/welcome-screen/WelcomeScreen.scss b/packages/excalidraw/components/welcome-screen/WelcomeScreen.scss
+index 127a040..99d2dd2 100644
+--- a/packages/excalidraw/components/welcome-screen/WelcomeScreen.scss
++++ b/packages/excalidraw/components/welcome-screen/WelcomeScreen.scss
+@@ -9,7 +9,7 @@
+   .welcome-screen-decor {
+     pointer-events: none;
+ 
+-    color: var(--color-gray-40);
++    color: var(--color-gray-70);
+ 
+     a {
+       --color: var(--color-primary);
+@@ -21,7 +21,7 @@
+ 
+   &.theme--dark {
+     .welcome-screen-decor {
+-      color: var(--color-gray-60);
++      color: var(--color-gray-50);
+     }
+   }
+ 
+@@ -164,7 +164,7 @@
+ 
+     pointer-events: var(--ui-pointerEvents);
+ 
+-    color: var(--color-gray-50);
++    color: var(--color-gray-80);
+     font-size: 0.875rem;
+ 
+     width: 100%;
+@@ -189,9 +189,6 @@
+       margin-right: auto;
+       text-align: left;
+       column-gap: 0.5rem;
+-      max-width: 8.5rem;
+-      overflow: hidden;
+-      white-space: nowrap;
+     }
+ 
+     &__icon {
+@@ -201,7 +198,7 @@
+ 
+     &__shortcut {
+       margin-left: auto;
+-      color: var(--color-gray-40);
++      color: var(--color-gray-70);
+       font-size: 0.75rem;
+     }
+   }
+@@ -230,10 +227,10 @@
+ 
+   &.theme--dark {
+     .welcome-screen-menu-item {
+-      color: var(--color-gray-80);
++      color: var(--color-gray-40);
+ 
+       &__shortcut {
+-        color: var(--color-gray-60);
++        color: var(--color-gray-50);
+       }
+     }
+ 

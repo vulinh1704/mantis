@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 240" width="960" height="240">
+  <rect width="960" height="240" fill="#eff6ff"/>
+  <g font-family="Inter, system-ui, sans-serif" font-size="18" font-weight="600">
+    <g transform="translate(110 50)"><rect width="200" height="140" rx="14" fill="#ffffff" stroke="#bfdbfe" stroke-width="2"/><rect x="24" y="28" width="120" height="12" rx="6" fill="#bfdbfe"/><rect x="24" y="56" width="152" height="10" rx="5" fill="#dbeafe"/><rect x="24" y="76" width="96" height="10" rx="5" fill="#dbeafe"/><text x="24" y="120" fill="#1d4ed8">Sent</text></g>
+    <g transform="translate(380 50)"><rect width="200" height="140" rx="14" fill="#ffffff" stroke="#bfdbfe" stroke-width="2"/><rect x="24" y="28" width="120" height="12" rx="6" fill="#bfdbfe"/><rect x="24" y="56" width="152" height="10" rx="5" fill="#dbeafe"/><rect x="24" y="76" width="96" height="10" rx="5" fill="#dbeafe"/><text x="24" y="120" fill="#b45309">Reminded</text></g>
+    <g transform="translate(650 50)"><rect width="200" height="140" rx="14" fill="#ffffff" stroke="#86efac" stroke-width="2"/><rect x="24" y="28" width="120" height="12" rx="6" fill="#bbf7d0"/><rect x="24" y="56" width="152" height="10" rx="5" fill="#dcfce7"/><rect x="24" y="76" width="96" height="10" rx="5" fill="#dcfce7"/><text x="24" y="120" fill="#15803d">Paid</text></g>
+    <path d="M322 120h46M592 120h46" stroke="#93c5fd" stroke-width="4" stroke-linecap="round"/>
+  </g>
+</svg>

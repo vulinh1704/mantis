@@ -1,0 +1,7 @@
+I fixed the three problems and `yarn check:ui` now passes in English and German at 360px. `yarn test:typecheck` is also clean. The change is 3 files, +7/−7, and nothing is committed.
+
+1. **Script error "Cannot read properties of null (reading 'scrollIntoView')"** (`packages/excalidraw/components/MobileToolbar.tsx`). On load, the toolbar looks for the active tool's button so it can scroll to it. It searched for a `.ToolIcon--selected` class, but nothing in the code uses that class; active buttons get `.ToolIcon--checked`. So the search always came back empty, and the `!` assertion made the next line crash. I changed it to `.ToolIcon--checked` and added `?.`, because the active tool can be inside the "More tools" dropdown and not on screen. The toolbar fade-in now works too: before, it crashed before reaching that step.
+2. **Undo/Redo covering "Text" and "More tools"** (`components/Actions.scss`). `.mobile-shape-actions` had a `top: 2.75rem`, and because that box is positioned relative to where it would normally sit, it was pushed about 44px down onto the toolbar. I removed that line, and Undo/Redo now sit above the toolbar again.
+3. **"Live-Zusammenarbeit..." cut off** (`components/welcome-screen/WelcomeScreen.scss`). The welcome menu label was capped at `max-width: 8.5rem` with `overflow: hidden; white-space: nowrap`, which clipped the longer German text. I removed those three lines so the label takes the full width of its column.
+
+I didn't run the full `yarn test:update` suite.

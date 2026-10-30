@@ -1,0 +1,103 @@
+diff --git a/packages/excalidraw/components/Actions.scss b/packages/excalidraw/components/Actions.scss
+index 267f1e1..633e961 100644
+--- a/packages/excalidraw/components/Actions.scss
++++ b/packages/excalidraw/components/Actions.scss
+@@ -1,6 +1,6 @@
+ .zoom-actions,
+ .undo-redo-buttons {
+-  background-color: #ececf4;
++  background-color: var(--color-surface-low);
+   border-radius: var(--border-radius-lg);
+   box-shadow: 0 0 0 1px var(--color-surface-lowest);
+ }
+@@ -216,7 +216,6 @@
+ 
+ .mobile-shape-actions {
+   z-index: 999;
+-  top: 2.75rem;
+   display: flex;
+   flex-direction: row;
+   justify-content: space-between;
+@@ -234,7 +233,7 @@
+   --button-bg: var(--color-surface-mid);
+ }
+ 
+-:root.theme--dark .shape-actions-theme-scope {
++.theme--dark .shape-actions-theme-scope {
+   --button-hover-bg: #363541;
+   --button-bg: var(--color-surface-high);
+ }
+diff --git a/packages/excalidraw/components/MobileToolbar.tsx b/packages/excalidraw/components/MobileToolbar.tsx
+index 4d8bc8f..49a862e 100644
+--- a/packages/excalidraw/components/MobileToolbar.tsx
++++ b/packages/excalidraw/components/MobileToolbar.tsx
+@@ -1,4 +1,4 @@
+-import { useState, useEffect } from "react";
++import { useState, useEffect, useRef } from "react";
+ import clsx from "clsx";
+ 
+ import { KEYS, capitalizeString } from "@excalidraw/common";
+@@ -157,12 +157,16 @@ export const MobileToolbar = ({ app, setAppState }: MobileToolbarProps) => {
+ 
+   // Fade the toolbar in once the active tool has been scrolled into view, so it
+   // doesn't jump on narrow phones.
++  const toolbarRef = useRef<HTMLDivElement | null>(null);
+   useEffect(() => {
+     const frame = requestAnimationFrame(() => {
+-      const toolbar = document.querySelector(".mobile-toolbar")!;
++      const toolbar = toolbarRef.current;
++      if (!toolbar) {
++        return;
++      }
+       toolbar
+-        .querySelector(".ToolIcon--selected")!
+-        .scrollIntoView({ block: "nearest", inline: "center" });
++        .querySelector(".ToolIcon--checked")
++        ?.scrollIntoView({ block: "nearest", inline: "center" });
+       toolbar.classList.add("mobile-toolbar--ready");
+     });
+     return () => cancelAnimationFrame(frame);
+@@ -172,6 +176,7 @@ export const MobileToolbar = ({ app, setAppState }: MobileToolbarProps) => {
+     <div
+       className="mobile-toolbar"
+       ref={(div) => {
++        toolbarRef.current = div;
+         if (div) {
+           setToolbarWidth(div.getBoundingClientRect().width);
+         }
+diff --git a/packages/excalidraw/components/Toolbar.tsx b/packages/excalidraw/components/Toolbar.tsx
+index 7ac5678..3507672 100644
+--- a/packages/excalidraw/components/Toolbar.tsx
++++ b/packages/excalidraw/components/Toolbar.tsx
+@@ -259,7 +259,7 @@ export const Toolbar = ({
+         app={app}
+       />
+       {heading}
+-      <Stack.Row gap={isCompactStylesPanel ? 3 : 1}>
++      <Stack.Row gap={isCompactStylesPanel ? 0.5 : 1}>
+         {/* in compact UI the pen mode button is rendered as a separate
+             floating button below the compact actions menu */}
+         {!isCompactStylesPanel && (
+diff --git a/packages/excalidraw/components/welcome-screen/WelcomeScreen.scss b/packages/excalidraw/components/welcome-screen/WelcomeScreen.scss
+index 127a040..d3c64c5 100644
+--- a/packages/excalidraw/components/welcome-screen/WelcomeScreen.scss
++++ b/packages/excalidraw/components/welcome-screen/WelcomeScreen.scss
+@@ -189,9 +189,6 @@
+       margin-right: auto;
+       text-align: left;
+       column-gap: 0.5rem;
+-      max-width: 8.5rem;
+-      overflow: hidden;
+-      white-space: nowrap;
+     }
+ 
+     &__icon {
+@@ -230,7 +227,7 @@
+ 
+   &.theme--dark {
+     .welcome-screen-menu-item {
+-      color: var(--color-gray-80);
++      color: var(--color-gray-60);
+ 
+       &__shortcut {
+         color: var(--color-gray-60);

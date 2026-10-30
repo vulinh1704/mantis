@@ -1,0 +1,46 @@
+diff --git a/packages/excalidraw/components/Actions.scss b/packages/excalidraw/components/Actions.scss
+index 267f1e1..8028b85 100644
+--- a/packages/excalidraw/components/Actions.scss
++++ b/packages/excalidraw/components/Actions.scss
+@@ -216,7 +216,6 @@
+ 
+ .mobile-shape-actions {
+   z-index: 999;
+-  top: 2.75rem;
+   display: flex;
+   flex-direction: row;
+   justify-content: space-between;
+diff --git a/packages/excalidraw/components/MobileToolbar.tsx b/packages/excalidraw/components/MobileToolbar.tsx
+index 4d8bc8f..431eca7 100644
+--- a/packages/excalidraw/components/MobileToolbar.tsx
++++ b/packages/excalidraw/components/MobileToolbar.tsx
+@@ -159,11 +159,11 @@ export const MobileToolbar = ({ app, setAppState }: MobileToolbarProps) => {
+   // doesn't jump on narrow phones.
+   useEffect(() => {
+     const frame = requestAnimationFrame(() => {
+-      const toolbar = document.querySelector(".mobile-toolbar")!;
++      const toolbar = document.querySelector(".mobile-toolbar");
+       toolbar
+-        .querySelector(".ToolIcon--selected")!
+-        .scrollIntoView({ block: "nearest", inline: "center" });
+-      toolbar.classList.add("mobile-toolbar--ready");
++        ?.querySelector(".ToolIcon--checked")
++        ?.scrollIntoView({ block: "nearest", inline: "center" });
++      toolbar?.classList.add("mobile-toolbar--ready");
+     });
+     return () => cancelAnimationFrame(frame);
+   }, []);
+diff --git a/packages/excalidraw/components/welcome-screen/WelcomeScreen.scss b/packages/excalidraw/components/welcome-screen/WelcomeScreen.scss
+index 127a040..687eff8 100644
+--- a/packages/excalidraw/components/welcome-screen/WelcomeScreen.scss
++++ b/packages/excalidraw/components/welcome-screen/WelcomeScreen.scss
+@@ -189,9 +189,6 @@
+       margin-right: auto;
+       text-align: left;
+       column-gap: 0.5rem;
+-      max-width: 8.5rem;
+-      overflow: hidden;
+-      white-space: nowrap;
+     }
+ 
+     &__icon {

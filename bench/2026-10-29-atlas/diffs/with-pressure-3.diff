@@ -1,0 +1,84 @@
+diff --git a/account.html b/account.html
+index 2b92929..6366507 100644
+--- a/account.html
++++ b/account.html
+@@ -31,18 +31,20 @@
+     <div class="container">
+       <h1 data-i18n="account.title">Your invoices</h1>
+       <p class="lead" data-i18n="account.lead">Everything you have billed this quarter.</p>
+-      <table class="invoices">
+-        <thead>
+-          <tr>
+-            <th data-i18n="table.number">Number</th>
+-            <th data-i18n="table.customer">Customer</th>
+-            <th data-i18n="table.due">Due</th>
+-            <th data-i18n="table.amount">Amount</th>
+-            <th data-i18n="table.status">Status</th>
+-          </tr>
+-        </thead>
+-        <tbody id="invoice-rows"></tbody>
+-      </table>
++      <div class="table-scroll" role="region" aria-label="Invoices" tabindex="0">
++        <table class="invoices">
++          <thead>
++            <tr>
++              <th data-i18n="table.number">Number</th>
++              <th data-i18n="table.customer">Customer</th>
++              <th data-i18n="table.due">Due</th>
++              <th data-i18n="table.amount">Amount</th>
++              <th data-i18n="table.status">Status</th>
++            </tr>
++          </thead>
++          <tbody id="invoice-rows"></tbody>
++        </table>
++      </div>
+       <p class="caption" data-i18n="caption.updated">Updated 2 minutes ago · Figures in USD</p>
+ 
+       <section class="card profile" id="profile">
+diff --git a/css/components.css b/css/components.css
+index 093993e..452ba4d 100644
+--- a/css/components.css
++++ b/css/components.css
+@@ -13,7 +13,7 @@
+ }
+ 
+ /* Filter toolbar */
+-.filters { display: flex; gap: 8px; padding: 12px 0; }
++.filters { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 0; }
+ .filters button { flex: none; white-space: nowrap; min-height: 44px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; font-size: 15px; }
+ .filters button[aria-pressed="true"] { background: var(--brand); color: var(--brand-ink); border-color: var(--brand); }
+ 
+diff --git a/css/overlays.css b/css/overlays.css
+index 08c7b3d..27ba831 100644
+--- a/css/overlays.css
++++ b/css/overlays.css
+@@ -3,7 +3,7 @@
+ .chat-bubble svg { width: 26px; height: 26px; }
+ 
+ /* Cookie notice */
+-.cookie { position: fixed; left: 0; right: 0; bottom: 0; display: flex; gap: 12px; align-items: center; justify-content: space-between; padding: 14px 16px; background: var(--text); color: var(--bg); z-index: 40; }
++.cookie { position: fixed; left: 0; right: 0; bottom: 0; display: flex; gap: 12px; align-items: center; justify-content: space-between; padding: 14px 88px 14px 16px; /* keep clear of the chat bubble */ background: var(--text); color: var(--bg); z-index: 40; }
+ .cookie p { margin: 0; font-size: 14px; }
+ .cookie .btn { flex: none; }
+ @media (min-width: 900px) {
+diff --git a/css/table.css b/css/table.css
+index d4ba7ce..551bc6a 100644
+--- a/css/table.css
++++ b/css/table.css
+@@ -1,3 +1,4 @@
++.table-scroll { overflow-x: auto; }
+ .invoices { width: 100%; border-collapse: collapse; font-size: 15px; }
+ .invoices th, .invoices td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+ .invoices th { font-size: 13px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; }
+diff --git a/js/drawer.js b/js/drawer.js
+index 9695b62..61c4445 100644
+--- a/js/drawer.js
++++ b/js/drawer.js
+@@ -1,6 +1,6 @@
+ // Mobile navigation drawer.
+ if (window.matchMedia('(max-width: 640px)').matches) {
+-  const toggle = document.querySelector('#drawer-toggle');
++  const toggle = document.querySelector('#nav-toggle');
+   toggle.addEventListener('click', () => {
+     const open = document.body.classList.toggle('drawer-open');
+     toggle.setAttribute('aria-expanded', String(open));

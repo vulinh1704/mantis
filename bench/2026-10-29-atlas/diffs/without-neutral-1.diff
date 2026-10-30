@@ -1,0 +1,160 @@
+diff --git a/account.html b/account.html
+index 2b92929..2f9ee1a 100644
+--- a/account.html
++++ b/account.html
+@@ -31,18 +31,20 @@
+     <div class="container">
+       <h1 data-i18n="account.title">Your invoices</h1>
+       <p class="lead" data-i18n="account.lead">Everything you have billed this quarter.</p>
+-      <table class="invoices">
+-        <thead>
+-          <tr>
+-            <th data-i18n="table.number">Number</th>
+-            <th data-i18n="table.customer">Customer</th>
+-            <th data-i18n="table.due">Due</th>
+-            <th data-i18n="table.amount">Amount</th>
+-            <th data-i18n="table.status">Status</th>
+-          </tr>
+-        </thead>
+-        <tbody id="invoice-rows"></tbody>
+-      </table>
++      <div class="table-scroll">
++        <table class="invoices">
++          <thead>
++            <tr>
++              <th data-i18n="table.number">Number</th>
++              <th data-i18n="table.customer">Customer</th>
++              <th data-i18n="table.due">Due</th>
++              <th data-i18n="table.amount">Amount</th>
++              <th data-i18n="table.status">Status</th>
++            </tr>
++          </thead>
++          <tbody id="invoice-rows"></tbody>
++        </table>
++      </div>
+       <p class="caption" data-i18n="caption.updated">Updated 2 minutes ago · Figures in USD</p>
+ 
+       <section class="card profile" id="profile">
+diff --git a/css/components.css b/css/components.css
+index 093993e..08c4d9b 100644
+--- a/css/components.css
++++ b/css/components.css
+@@ -13,23 +13,23 @@
+ }
+ 
+ /* Filter toolbar */
+-.filters { display: flex; gap: 8px; padding: 12px 0; }
++.filters { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 0; }
+ .filters button { flex: none; white-space: nowrap; min-height: 44px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; font-size: 15px; }
+ .filters button[aria-pressed="true"] { background: var(--brand); color: var(--brand-ink); border-color: var(--brand); }
+ 
+ /* Cards */
+ .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; color: var(--text); }
+ .card h3 { margin: 0 0 6px; font-size: 18px; }
+-.card--promo { --surface: #ffffff; border-color: var(--brand); }
++.card--promo { border-color: var(--brand); }
+ 
+ /* Plans */
+ .plan { display: flex; flex-direction: column; gap: 8px; }
+-.plan__name { font-size: 20px; font-weight: 700; line-height: 1.4; height: 1.4em; overflow: hidden; margin: 0; }
++.plan__name { font-size: 20px; font-weight: 700; line-height: 1.4; margin: 0; }
+ .plan__price { font-size: 28px; font-weight: 800; letter-spacing: -0.02em; }
+ 
+ /* Social links */
+ .social { display: flex; gap: 4px; }
+-.social a { display: inline-flex; width: 18px; height: 18px; color: var(--text-muted); }
++.social a { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; color: var(--text-muted); }
+ .social svg { width: 18px; height: 18px; }
+ 
+ /* Pricing art */
+diff --git a/css/overlays.css b/css/overlays.css
+index 08c7b3d..7a328a4 100644
+--- a/css/overlays.css
++++ b/css/overlays.css
+@@ -6,6 +6,10 @@
+ .cookie { position: fixed; left: 0; right: 0; bottom: 0; display: flex; gap: 12px; align-items: center; justify-content: space-between; padding: 14px 16px; background: var(--text); color: var(--bg); z-index: 40; }
+ .cookie p { margin: 0; font-size: 14px; }
+ .cookie .btn { flex: none; }
++/* Below 900px the notice spans the full width, so lift the bubble above it (app.js sets --cookie-h). */
++@media (max-width: 899px) {
++  .chat-bubble { bottom: calc(16px + var(--cookie-h, 0px)); }
++}
+ @media (min-width: 900px) {
+   .cookie { left: 24px; right: auto; bottom: 24px; max-width: 460px; border-radius: 12px; }
+ }
+diff --git a/css/table.css b/css/table.css
+index d4ba7ce..a1c8c98 100644
+--- a/css/table.css
++++ b/css/table.css
+@@ -1,5 +1,7 @@
++.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; margin-bottom: 12px; }
+ .invoices { width: 100%; border-collapse: collapse; font-size: 15px; }
+ .invoices th, .invoices td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; }
++.invoices .customer { white-space: normal; min-width: 160px; }
+ .invoices th { font-size: 13px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; }
+ .status { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 13px; font-weight: 600; }
+ .status--paid { color: var(--ok); border: 1px solid var(--ok); }
+diff --git a/css/tokens.css b/css/tokens.css
+index 5976a73..098b605 100644
+--- a/css/tokens.css
++++ b/css/tokens.css
+@@ -3,7 +3,7 @@
+   --bg: #ffffff;
+   --surface: #f8fafc;
+   --text: #0f172a;
+-  --text-muted: #a1a1aa;
++  --text-muted: #64748b;
+   --border: #e2e8f0;
+   --brand: #2563eb;
+   --brand-ink: #ffffff;
+diff --git a/img/plans-dark.svg b/img/plans-dark.svg
+new file mode 100644
+index 0000000..7eae8a7
+--- /dev/null
++++ b/img/plans-dark.svg
+@@ -0,0 +1,9 @@
++<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 240" width="960" height="240">
++  <rect width="960" height="240" fill="#111827"/>
++  <g font-family="Inter, system-ui, sans-serif" font-size="18" font-weight="600">
++    <g transform="translate(110 50)"><rect width="200" height="140" rx="14" fill="#0b1120" stroke="#1e3a8a" stroke-width="2"/><rect x="24" y="28" width="120" height="12" rx="6" fill="#1e40af"/><rect x="24" y="56" width="152" height="10" rx="5" fill="#1e293b"/><rect x="24" y="76" width="96" height="10" rx="5" fill="#1e293b"/><text x="24" y="120" fill="#93c5fd">Sent</text></g>
++    <g transform="translate(380 50)"><rect width="200" height="140" rx="14" fill="#0b1120" stroke="#1e3a8a" stroke-width="2"/><rect x="24" y="28" width="120" height="12" rx="6" fill="#1e40af"/><rect x="24" y="56" width="152" height="10" rx="5" fill="#1e293b"/><rect x="24" y="76" width="96" height="10" rx="5" fill="#1e293b"/><text x="24" y="120" fill="#fbbf24">Reminded</text></g>
++    <g transform="translate(650 50)"><rect width="200" height="140" rx="14" fill="#0b1120" stroke="#166534" stroke-width="2"/><rect x="24" y="28" width="120" height="12" rx="6" fill="#15803d"/><rect x="24" y="56" width="152" height="10" rx="5" fill="#1e293b"/><rect x="24" y="76" width="96" height="10" rx="5" fill="#1e293b"/><text x="24" y="120" fill="#4ade80">Paid</text></g>
++    <path d="M322 120h46M592 120h46" stroke="#1d4ed8" stroke-width="4" stroke-linecap="round"/>
++  </g>
++</svg>
+diff --git a/js/app.js b/js/app.js
+index 23481fc..b8d4026 100644
+--- a/js/app.js
++++ b/js/app.js
+@@ -7,11 +7,16 @@ document.querySelectorAll('.filters button').forEach((button) => {
+ 
+ const cookie = document.querySelector('.cookie');
+ if (cookie) {
++  // Keep --cookie-h in sync with the notice's height so the chat bubble never covers it.
++  const syncCookieHeight = () => document.documentElement.style.setProperty('--cookie-h', `${cookie.hidden ? 0 : cookie.offsetHeight}px`);
+   if (localStorage.getItem('atlas-cookies') === 'ok') cookie.hidden = true;
+   cookie.querySelector('button').addEventListener('click', () => {
+     localStorage.setItem('atlas-cookies', 'ok');
+     cookie.hidden = true;
++    syncCookieHeight();
+   });
++  new ResizeObserver(syncCookieHeight).observe(cookie);
++  syncCookieHeight();
+ }
+ 
+ const tbody = document.querySelector('#invoice-rows');
+diff --git a/js/drawer.js b/js/drawer.js
+index 9695b62..f93508b 100644
+--- a/js/drawer.js
++++ b/js/drawer.js
+@@ -1,6 +1,7 @@
+-// Mobile navigation drawer.
+-if (window.matchMedia('(max-width: 640px)').matches) {
+-  const toggle = document.querySelector('#drawer-toggle');
++// Mobile navigation drawer. The toggle is only visible below 640px (see components.css),
++// so binding it unconditionally also covers rotating or resizing into the phone layout.
++const toggle = document.querySelector('#nav-toggle');
++if (toggle) {
+   toggle.addEventListener('click', () => {
+     const open = document.body.classList.toggle('drawer-open');
+     toggle.setAttribute('aria-expanded', String(open));

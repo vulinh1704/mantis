@@ -1,0 +1,11 @@
+/* Support chat bubble */
+.chat-bubble { position: fixed; right: 16px; bottom: 16px; width: 56px; height: 56px; border-radius: 50%; border: 0; background: var(--brand); color: var(--brand-ink); box-shadow: 0 8px 24px rgba(0, 0, 0, .25); z-index: 50; display: inline-flex; align-items: center; justify-content: center; }
+.chat-bubble svg { width: 26px; height: 26px; }
+
+/* Cookie notice */
+.cookie { position: fixed; left: 0; right: 0; bottom: 0; display: flex; gap: 12px; align-items: center; justify-content: space-between; padding: 14px 16px; background: var(--text); color: var(--bg); z-index: 40; }
+.cookie p { margin: 0; font-size: 14px; }
+.cookie .btn { flex: none; }
+@media (min-width: 900px) {
+  .cookie { left: 24px; right: auto; bottom: 24px; max-width: 460px; border-radius: 12px; }
+}
