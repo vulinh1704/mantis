@@ -29,6 +29,47 @@ export function contextOptions(cell, storageState = null) {
   };
 }
 
+/**
+ * The URL a locale cell opens: the route itself, or with the locale as a path prefix
+ * (`path:/{locale}`: `/settings` -> `/vi/settings`) or a query parameter (`query:lang`).
+ * @param {URL} baseUrl
+ * @param {string} route
+ * @param {string} locale
+ * @param {import('./options.js').LocaleStrategy} strategy
+ */
+export function localeUrl(baseUrl, route, locale, strategy) {
+  const url = new URL(route, baseUrl);
+  if (strategy.kind === 'path') {
+    const prefix = strategy.template.replace('{locale}', encodeURIComponent(locale)).replace(/\/+$/, '');
+    url.pathname = prefix + url.pathname;
+  } else if (strategy.kind === 'query') {
+    url.searchParams.set(strategy.name, locale);
+  }
+  return url.href;
+}
+
+/**
+ * Give a cell's context the locale before the page loads: a cookie on the app's origin
+ * (`cookie:<name>`), or a localStorage entry written before any page script runs (`storage:<key>`).
+ * @param {import('playwright').BrowserContext} context
+ * @param {string} url
+ * @param {string} locale
+ * @param {import('./options.js').LocaleStrategy} strategy
+ */
+export async function applyLocaleStrategy(context, url, locale, strategy) {
+  if (strategy.kind === 'cookie') {
+    await context.addCookies([{ name: strategy.name, value: locale, url: new URL(url).origin }]);
+  } else if (strategy.kind === 'storage') {
+    await context.addInitScript(({ key, value }) => {
+      try {
+        window.localStorage.setItem(key, value);
+      } catch {
+        // storage disabled (opaque origin): nothing to set
+      }
+    }, { key: strategy.key, value: locale });
+  }
+}
+
 /** Collect network results and keep an in-flight counter so we can wait for quiet. */
 export function trackNetwork(page) {
   const net = { responses: [], failed: [], inflight: 0, lastActivity: Date.now() };

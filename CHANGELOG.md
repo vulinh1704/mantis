@@ -2,6 +2,10 @@
 
 Full notes, with images, are on the [releases page](https://github.com/vulinh1704/mantis/releases).
 
+## Unreleased
+
+- `--locale-strategy path:/{locale} | query:<param> | cookie:<name> | storage:<key>` reaches the other languages of apps that don't follow the browser language: next-intl, i18next, Vue i18n, Rails. A run is compared only with earlier runs that used the same strategy.
+
 ## 0.4.0 (2026-10-30)
 
 - Contrast and dark-mode leaks are read from screenshot pixels when axe can't compute the background: text on a `<canvas>` (whiteboards, maps, editors) or under transparent layers (#11).

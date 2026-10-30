@@ -71,6 +71,17 @@ Then someone opens the page on a phone:
 mantis look http://localhost:3000 --routes /,/settings --locales en,vi
 ```
 
+Each language cell sets the browser locale and `Accept-Language`. Many apps pick their language another way, and `--locale-strategy` handles that:
+
+| The app switches language by | Pass |
+|---|---|
+| a URL prefix, e.g. `/vi/settings` | `--locale-strategy path:/{locale}` |
+| a query parameter | `--locale-strategy query:lang` |
+| a cookie (next-intl, Rails) | `--locale-strategy cookie:NEXT_LOCALE` |
+| localStorage (i18next) | `--locale-strategy storage:i18nextLng` |
+
+A language whose page text comes out the same as the first one is reported as "not localized". That usually means the strategy is wrong.
+
 <p align="center">
   <img src="assets/proof.png" width="880" alt="Mantis fix receipt: the same 24 screens before and after the fixes, errors going from 14 to 0, with 0 cover-ups">
 </p>

@@ -9,12 +9,14 @@ import { renderContactSheet } from './contact-sheet.js';
 import { CELL_DETECTORS, CROSS_DETECTORS } from './detectors/index.js';
 import { installMantisLib } from './inpage/lib.js';
 import { collectState } from './inpage/state.js';
-import { UsageError, formatDarkStrategy, readStorageState, routeSlug } from './options.js';
+import { UsageError, formatDarkStrategy, formatLocaleStrategy, readStorageState, routeSlug } from './options.js';
 import {
   applyDarkStrategy,
+  applyLocaleStrategy,
   contextOptions,
   finishAnimations,
   fontsReady,
+  localeUrl,
   nextFrames,
   pageText,
   prescroll,
@@ -159,6 +161,7 @@ async function runCell(browser, opts, cell, baseline, targets, session, log) {
   };
   try {
     for (const d of CELL_DETECTORS) if (d.setup) await d.setup(page, ctx);
+    if (opts.localeStrategy) await applyLocaleStrategy(context, cell.url, cell.locale, opts.localeStrategy);
 
     let response;
     try {
@@ -316,7 +319,7 @@ export async function look(opts, { log = () => {} } = {}) {
           const cell = {
             id: `${slugs.get(g.route)}__${g.viewport.name}__${scheme}__${g.locale}`,
             route: g.route,
-            url: new URL(g.route, opts.baseUrl).href,
+            url: localeUrl(opts.baseUrl, g.route, g.locale, opts.localeStrategy ?? { kind: 'browser' }),
             viewport: g.viewport,
             scheme,
             locale: g.locale,
@@ -429,7 +432,10 @@ export async function look(opts, { log = () => {} } = {}) {
         const nl = cells.filter((c) => c.route === route && c.locale === locale && c.status === 'not-localized');
         if (nl.length) {
           const all = cells.filter((c) => c.route === route && c.locale === locale).length;
-          notes.push(`\`${route}\` · ${locale}: not localized — page text is identical to ${opts.locales[0]} in ${nl.length === all ? 'every cell' : `${nl.length} of ${all} cells`}; detectors were not re-run there.`);
+          const hint = (opts.localeStrategy?.kind ?? 'browser') === 'browser'
+            ? ' If the app picks its language from the URL, a cookie or localStorage, pass --locale-strategy.'
+            : '';
+          notes.push(`\`${route}\` · ${locale}: not localized — page text is identical to ${opts.locales[0]} in ${nl.length === all ? 'every cell' : `${nl.length} of ${all} cells`}; detectors were not re-run there.${hint}`);
         }
       }
       const ne = noEffect.get(route);
@@ -451,7 +457,11 @@ export async function look(opts, { log = () => {} } = {}) {
       runId,
       startedAt,
       finishedAt: new Date(),
-      options: { ...opts, darkStrategyText: formatDarkStrategy(opts.darkStrategy) },
+      options: {
+        ...opts,
+        darkStrategyText: formatDarkStrategy(opts.darkStrategy),
+        localeStrategyText: formatLocaleStrategy(opts.localeStrategy ?? { kind: 'browser' }),
+      },
       cells,
       issues: registry.issues,
       notes,

@@ -46,6 +46,10 @@ README for how it reaches a dev server on the host).
 
 - `--locales en,vi` when the app has translations. Longer languages (Vietnamese,
   German) break layouts that look fine in English.
+- `--locale-strategy` when the app doesn't follow the browser language (the report
+  says a locale is "not localized"). Check how the app switches language first:
+  `path:/{locale}` (`/vi/settings`), `query:lang`, `cookie:NEXT_LOCALE` (next-intl)
+  or `storage:i18nextLng` (i18next).
 - `--dark-strategy class:dark` or `--dark-strategy attr:data-theme=dark` when dark
   mode is a class or attribute toggle rather than the OS setting. Check how the app
   switches themes before choosing.
