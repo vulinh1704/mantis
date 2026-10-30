@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Question or setup help
+    url: https://github.com/vulinh1704/mantis/discussions/categories/q-a
+    about: Running Mantis on your app, reaching a dev server, choosing flags. Ask in Q&A.
+  - name: Show what Mantis found
+    url: https://github.com/vulinh1704/mantis/discussions/categories/show-and-tell
+    about: Share a contact sheet, a bug it caught, or one it missed.
