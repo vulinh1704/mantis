@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Signal</title>
+<!-- English only, and everything fits. Text that grows by about 40% does not: two fixed-width,
+     clipped boxes (one rendered after load, like a framework re-render) get cut in the
+     pseudo-locale. The brand name is marked translate="no", so it must stay as it is and fit. -->
+<style>
+  body { margin: 0; padding: 24px; font: 16px/1.5 "DejaVu Sans Mono", Consolas, monospace; color: #111827; background: #fff; }
+  .box { display: inline-block; white-space: nowrap; overflow: hidden; vertical-align: top; }
+  .brand { width: 7ch; font-weight: 700; }
+  .btn { width: 11ch; background: #1d4ed8; color: #fff; }
+  .chip { width: 7ch; background: #dcfce7; color: #14532d; }
+  p { max-width: 40ch; }
+</style>
+</head>
+<body>
+  <p><span class="box brand" translate="no">Signal</span></p>
+  <p>Weekly notes on shipping software, in your inbox.</p>
+  <p><a class="box btn" id="subscribe" href="#subscribe">Subscribe</a></p>
+  <p><span class="box chip" id="status"></span></p>
+  <script>
+    setTimeout(() => { document.getElementById('status').textContent = 'Saved'; }, 200);
+  </script>
+</body>
+</html>

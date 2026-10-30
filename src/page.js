@@ -8,11 +8,13 @@ export function acceptLanguage(locale) {
 
 /**
  * Playwright context options for one cell.
- * @param {{viewport: import('./options.js').Viewport, scheme: 'light'|'dark', locale: string}} cell
+ * @param {{viewport: import('./options.js').Viewport, scheme: 'light'|'dark', locale: string, browserLocale?: string}} cell
+ *   `browserLocale` is the real locale the browser asks for (the pseudo-locale cell asks for its base language)
  * @param {{cookies: object[], origins: object[]} | null} [storageState]  session to start with (--storage-state)
  */
 export function contextOptions(cell, storageState = null) {
   const v = cell.viewport;
+  const locale = cell.browserLocale ?? cell.locale;
   return {
     viewport: { width: v.width, height: v.height },
     deviceScaleFactor: 1,
@@ -20,8 +22,8 @@ export function contextOptions(cell, storageState = null) {
     hasTouch: v.hasTouch,
     colorScheme: cell.scheme,
     reducedMotion: 'reduce',
-    locale: cell.locale,
-    extraHTTPHeaders: { 'Accept-Language': acceptLanguage(cell.locale) },
+    locale,
+    extraHTTPHeaders: { 'Accept-Language': acceptLanguage(locale) },
     bypassCSP: true,
     ignoreHTTPSErrors: true,
     serviceWorkers: 'block',
@@ -68,6 +70,85 @@ export async function applyLocaleStrategy(context, url, locale, strategy) {
       }
     }, { key: strategy.key, value: locale });
   }
+}
+
+/**
+ * Pseudo-localize every page of a context: from the first parsed node on, and again whenever the
+ * app re-renders, each visible string becomes accented, about 40% longer and bracketed
+ * ("Settings" -> "[Šééţţţîññĝšš]"), the way real translations grow. The brackets show when the
+ * start or the end of a string gets cut. Code, scripts, form fields the user types in and
+ * `translate="no"` content are left alone.
+ * @param {import('playwright').BrowserContext} context
+ */
+export async function installPseudoLocale(context) {
+  await context.addInitScript(() => {
+    const MAP = {
+      a: 'á', b: 'ƀ', c: 'ç', d: 'ð', e: 'é', f: 'ƒ', g: 'ĝ', h: 'ĥ', i: 'î', j: 'ĵ', k: 'ķ', l: 'ļ', m: 'ɱ',
+      n: 'ñ', o: 'ö', p: 'þ', q: 'ǫ', r: 'ŕ', s: 'š', t: 'ţ', u: 'û', v: 'ṽ', w: 'ŵ', x: 'ẋ', y: 'ý', z: 'ž',
+      A: 'Å', B: 'Ɓ', C: 'Ç', D: 'Ð', E: 'É', F: 'Ƒ', G: 'Ĝ', H: 'Ĥ', I: 'Î', J: 'Ĵ', K: 'Ķ', L: 'Ļ', M: 'Ṁ',
+      N: 'Ñ', O: 'Ö', P: 'Þ', Q: 'Ǫ', R: 'Ŕ', S: 'Š', T: 'Ţ', U: 'Û', V: 'Ṽ', W: 'Ŵ', X: 'Ẋ', Y: 'Ý', Z: 'Ž',
+    };
+    const SKIP = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEXTAREA', 'CODE', 'PRE', 'KBD', 'SAMP', 'TEMPLATE']);
+    const done = new WeakMap(); // text node -> the string we wrote, so our own writes are not redone
+    const pseudo = (s) => {
+      if (!/[A-Za-z]/.test(s)) return s;
+      const lead = s.match(/^\s*/)[0];
+      const trail = s.match(/\s*$/)[0];
+      const core = s.slice(lead.length, s.length - trail.length);
+      const letters = (core.match(/[A-Za-z]/g) || []).length;
+      const extra = Math.ceil(letters * 0.4);
+      let out = '';
+      let i = 0;
+      for (const ch of core) {
+        const c = MAP[ch] ?? ch;
+        out += c;
+        if (/[A-Za-z]/.test(ch)) {
+          // Spread the extra letters evenly over the string.
+          if (Math.floor(((i + 1) * extra) / letters) > Math.floor((i * extra) / letters)) out += c;
+          i++;
+        }
+      }
+      return `${lead}[${out}]${trail}`;
+    };
+    const skipped = (el) => {
+      for (let n = el; n; n = n.parentElement) {
+        if (SKIP.has(n.tagName) || n.getAttribute?.('translate') === 'no' || n.isContentEditable) return true;
+      }
+      return false;
+    };
+    const fixText = (t) => {
+      if (done.get(t) === t.data || !t.parentElement || skipped(t.parentElement)) return;
+      const next = pseudo(t.data);
+      done.set(t, next);
+      if (next !== t.data) t.data = next;
+    };
+    const fixElement = (el) => {
+      if (skipped(el)) return;
+      if (el.placeholder && !el.dataset.mantisPseudo) {
+        el.placeholder = pseudo(el.placeholder);
+        el.dataset.mantisPseudo = '1';
+      }
+      if (el.tagName === 'INPUT' && /^(submit|button|reset)$/i.test(el.type) && el.value && !el.dataset.mantisPseudo) {
+        el.value = pseudo(el.value);
+        el.dataset.mantisPseudo = '1';
+      }
+      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
+      for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+        if (n.nodeType === Node.TEXT_NODE) fixText(n);
+        else if (n.placeholder || n.tagName === 'INPUT') fixElement(n);
+      }
+    };
+    new MutationObserver((records) => {
+      for (const r of records) {
+        if (r.type === 'characterData') fixText(r.target);
+        for (const n of r.addedNodes) {
+          if (n.nodeType === Node.TEXT_NODE) fixText(n);
+          else if (n.nodeType === Node.ELEMENT_NODE) fixElement(n);
+        }
+      }
+    }).observe(document, { childList: true, subtree: true, characterData: true });
+    document.addEventListener('DOMContentLoaded', () => document.body && fixElement(document.body));
+  });
 }
 
 /** Collect network results and keep an in-flight counter so we can wait for quiet. */

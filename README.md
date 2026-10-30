@@ -82,6 +82,8 @@ Each language cell sets the browser locale and `Accept-Language`. Many apps pick
 
 A language whose page text comes out the same as the first one is reported as "not localized". That usually means the strategy is wrong.
 
+**No translations yet?** Add the pseudo-locale (from v0.5): `--locales en,pseudo`. That cell loads the first language and rewrites every visible string the way translations grow. "Subscribe" becomes `[Šûƀƀšççŕîîƀéé]`: accented, about 40% longer, and bracketed, so a missing `]` shows the end was cut. Text the app renders later is rewritten too. Code, form input and `translate="no"` content are left alone. The pseudo-locale finds layouts that break with longer text. It can't tell which strings are hard-coded, because it rewrites them all.
+
 <p align="center">
   <img src="assets/proof.png" width="880" alt="Mantis fix receipt: the same 24 screens before and after the fixes, errors going from 14 to 0, with 0 cover-ups">
 </p>
