@@ -28,7 +28,8 @@ in <out>/latest.
                                desktop 1440x900, or WxH / name=WxH
   --schemes light,dark         color schemes (default both)
   --locales en,vi              locales (default en); a locale whose page text is
-                               identical to the first one is marked "not localized"
+                               identical to the first one is marked "not localized";
+                               "pseudo" rewrites the first language's text ~40% longer
   --dark-strategy media|class:dark|attr:data-theme=dark
                                how dark mode is switched on (default media)
   --locale-strategy browser|path:/{locale}|query:lang|cookie:NEXT_LOCALE|storage:i18nextLng

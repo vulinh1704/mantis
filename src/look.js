@@ -9,13 +9,14 @@ import { renderContactSheet } from './contact-sheet.js';
 import { CELL_DETECTORS, CROSS_DETECTORS } from './detectors/index.js';
 import { installMantisLib } from './inpage/lib.js';
 import { collectState } from './inpage/state.js';
-import { UsageError, formatDarkStrategy, formatLocaleStrategy, readStorageState, routeSlug } from './options.js';
+import { PSEUDO_LOCALE, UsageError, baseLocale, formatDarkStrategy, formatLocaleStrategy, readStorageState, routeSlug } from './options.js';
 import {
   applyDarkStrategy,
   applyLocaleStrategy,
   contextOptions,
   finishAnimations,
   fontsReady,
+  installPseudoLocale,
   localeUrl,
   nextFrames,
   pageText,
@@ -161,7 +162,8 @@ async function runCell(browser, opts, cell, baseline, targets, session, log) {
   };
   try {
     for (const d of CELL_DETECTORS) if (d.setup) await d.setup(page, ctx);
-    if (opts.localeStrategy) await applyLocaleStrategy(context, cell.url, cell.locale, opts.localeStrategy);
+    if (opts.localeStrategy) await applyLocaleStrategy(context, cell.url, cell.browserLocale ?? cell.locale, opts.localeStrategy);
+    if (cell.locale === PSEUDO_LOCALE) await installPseudoLocale(context);
 
     let response;
     try {
@@ -319,10 +321,11 @@ export async function look(opts, { log = () => {} } = {}) {
           const cell = {
             id: `${slugs.get(g.route)}__${g.viewport.name}__${scheme}__${g.locale}`,
             route: g.route,
-            url: localeUrl(opts.baseUrl, g.route, g.locale, opts.localeStrategy ?? { kind: 'browser' }),
+            url: localeUrl(opts.baseUrl, g.route, baseLocale(g.locale, opts.locales), opts.localeStrategy ?? { kind: 'browser' }),
             viewport: g.viewport,
             scheme,
             locale: g.locale,
+            browserLocale: baseLocale(g.locale, opts.locales),
             localeIndex: g.localeIndex,
           };
           const targets = base ? baselineTargets(base, g.route, `${g.viewport.name}/${scheme}/${g.locale}`) : [];
