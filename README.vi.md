@@ -120,7 +120,7 @@ Chi tiết (ảnh sheet, cách xếp hạng, API và bên thứ ba) ở [README 
 
 ## Cài đặt
 
-> Mantis đang ở giai đoạn đầu (v0.6). Có chỗ chưa mượt, gặp lỗi thì [mở issue](https://github.com/vulinh1704/mantis/issues) giúp mình.
+> Mantis đang ở giai đoạn đầu (v0.7). Có chỗ chưa mượt, gặp lỗi thì [mở issue](https://github.com/vulinh1704/mantis/issues) giúp mình.
 
 **Claude Code**
 

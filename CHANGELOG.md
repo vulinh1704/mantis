@@ -2,7 +2,7 @@
 
 Full notes, with images, are on the [releases page](https://github.com/vulinh1704/mantis/releases).
 
-## Unreleased
+## 0.7.0 (2026-10-30)
 
 - `mantis mcp` serves Mantis to any MCP client over stdio, with four tools that take the CLI's options: `mantis_look`, `mantis_perf`, `mantis_learn` and `mantis_proof`. Each returns its report as text and its sheet as an image, and reports progress while it runs. `claude mcp add mantis -- npx -y @vulinh1704/mantis mcp`. No new dependencies. `server.json` describes the server for the MCP Registry (`io.github.vulinh1704/mantis`).
 - GitHub Action (`uses: vulinh1704/mantis@v0.7.0`): runs `look` or `perf` on a pull request's preview deployment. With `baseline-url` it first measures your live site and compares with it: fixed, new, cover-ups, and the perf receipt. The result goes to a pull request comment that is updated on every push (for `deployment_status` events too, through the deployed commit), to the job summary, and to an artifact with the sheets and screenshots. It fails on errors, on cover-ups only, or never (`fail-on`).
