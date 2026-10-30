@@ -89,6 +89,26 @@ Mantis: 0 errors, 0 warnings in 24 cells
   vs 2026-10-29T11-51-22: 18 fixed · 0 new · 0 cover-ups · 0 lost
 ```
 
+## 真的变快了，还是只是变空了？（`mantis perf`，v0.6 起）
+
+让智能体“把页面变快”，它可能会删掉首图、把列表砍到五行，或者把首屏要显示的内容也懒加载。数字变好看了，页面却变差了。`mantis perf` 做这些事：
+- 像在一部中端手机、慢速 4G 网络上那样测量页面，取多次冷启动加载的中位数；
+- 把原因定位到代码行：占用主线程的函数、慢的或串行的 API 调用、重复请求、N+1、过大的图片、第三方脚本；
+- 按影响和修复风险给修复方案排序：先做、计划、可选、由你决定；
+- 如果页面变快只是因为内容没了，就报告 `cover-up` 错误。
+
+```bash
+mantis perf http://localhost:4173 --routes /,/pricing
+```
+
+修复后再运行一次，会得到一张回执。变化不超过多次运行之间的波动就不算数：
+
+```
+vs 2026-10-30T12-32-02: LCP 2.5 s → 36 ms · TBT 121 ms → 0 ms · CLS 0.164 → 0 · transferred 551 KB → 354 KB · 11 fixed · 0 new · 0 cover-ups
+```
+
+详情（性能报告图、排序方式、API 和第三方）见[英文 README](README.md#faster-or-just-emptier-mantis-perf-from-v06)。
+
 ## 数据
 
 - **预埋的问题：** `fixtures/buggy-app` 里有 13 个界面问题。Mantis 全部报出，位置正好在预埋它们的屏幕、主题和语言组合里，没有多报。在修好的版本（`clean-app`）上报告为 0。两项检查都在 CI 中运行。

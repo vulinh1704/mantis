@@ -40,7 +40,8 @@ Then someone opens the page on a phone:
 2. checks every screen size, both themes and every language you ship;
 3. boxes what is broken in red;
 4. fixes it at the root, and flags any "fix" that only hides the bug;
-5. proves it with before/after screenshots.
+5. proves it with before/after screenshots;
+6. measures how fast it is on a slow phone, ranks the fixes, and catches speed-ups that only remove content (from v0.6).
 
 <p align="center">
   <img src="assets/contact-sheet.png" width="880" alt="A Mantis contact sheet: every page on mobile, tablet and desktop, in light and dark mode, with problems boxed in red">
@@ -60,6 +61,7 @@ Then someone opens the page on a phone:
 | Console errors, broken images | Red errors, empty boxes | Nobody opened DevTools |
 | Layout shift | Content jumps while you read | Everything loads instantly on localhost |
 | Off-style values | A blue one shade off your brand, a 15px corner among 16px ones | They hard-code a value instead of using your token |
+| Slow pages (`mantis perf`) | A 5 s wait on a phone, API calls in a row, a chat widget holding the page | Localhost on a laptop is fast |
 
 ## How it works
 
@@ -117,6 +119,93 @@ ends with a receipt:
 Mantis: 0 errors, 0 warnings in 24 cells
   vs 2026-10-29T11-51-22: 18 fixed · 0 new · 0 cover-ups · 0 lost
 ```
+
+## Faster, or just emptier? (`mantis perf`, from v0.6)
+
+Ask an agent to make a page faster and it may remove the hero image, cut the
+list to five rows, or lazy-load what the first screen shows. The numbers get
+better, and the page gets worse. `mantis perf` measures the page, says what
+makes it slow down to the line of code, ranks the fixes by impact and risk, and
+fails the run when a "speed-up" only removed content.
+
+```bash
+mantis perf http://localhost:4173 --routes /,/pricing
+```
+
+<p align="center">
+  <img src="assets/perf-sheet.png" width="880" alt="A Mantis perf sheet: LCP, blocking time and layout shift rated against Core Web Vitals, a filmstrip with the LCP frame circled, a waterfall of the requests that matter, the first five fixes and what each third party costs">
+</p>
+
+**Measures like a phone.** Every route gets N cold visits (`--runs 5` by default)
+in Chromium. The default profile is a mid-range phone on slow 4G: 4× slower
+CPU, 562 ms round trips. `--profile desktop` turns the throttling off. You get
+the median and spread of LCP, FCP, TBT, CLS, TTFB, when the API data was in,
+bytes and requests. A development server is called out, since its numbers are
+not what users get.
+
+One more visit runs without throttling, because throttling hides what it
+touches:
+- the server's real wait per request;
+- a CPU profile that names the functions the main thread spent its time in;
+- coverage of the code that never ran.
+
+**Says what to fix, ranked.** `perf.md` starts with the fixes:
+
+| bucket | means |
+|---|---|
+| Do first | worth it, low risk |
+| Plan | worth it, the fix needs care |
+| Nice to have | small gains |
+| Your call | a product decision, such as dropping a vendor |
+
+Each fix names a culprit the agent can open. That is a selector, a URL, or
+`file:line` with the function and its callers (`loadConfig` /app.js:4 ← `main`
+/app.js:51). It also gives the metric the fix moves with an estimated saving and
+how sure that estimate is, and the detected framework's own way to fix it
+(Next.js, Nuxt, Angular, Vue, React, SvelteKit). It finds:
+- an LCP image that is lazy-loaded or found late;
+- images much larger than they are drawn;
+- files in `<head>` that hold the first paint;
+- functions that hold the main thread;
+- code that never runs;
+- fonts that hide text;
+- layout shifts and what caused them (an image without a size, a banner inserted above, a list filled late);
+- a slow HTML response.
+
+**Slow APIs.** Every API call is traced to the code that made it. Mantis finds:
+- endpoints that are slow on the server;
+- calls that wait for each other;
+- the same call made twice;
+- one call per item (N+1);
+- large JSON;
+- a first call that starts late, with the script it waited for.
+
+**Third parties.** Grouped by vendor (Google Analytics, Intercom, YouTube,
+Stripe and about 50 more): their bytes, main-thread time, render-blocking files
+and iframes. Each kind gets its fix: a facade for chat and video, analytics
+after the page is interactive, self-hosted fonts. Whether a costly vendor is
+worth it goes under "Your call".
+
+**A receipt you can trust.** Run it again after a fix and it compares itself
+with the previous run of the same URL and profile:
+
+```
+vs 2026-10-30T12-32-02: LCP 2.5 s → 36 ms · TBT 121 ms → 0 ms · CLS 0.164 → 0 · transferred 551 KB → 354 KB · 11 fixed · 0 new · 0 cover-ups
+```
+
+A change counts only beyond the noise, meaning both runs' spread. Anything else
+is shown as `≈`. A route that got faster because its LCP image, its text, its
+first-screen images, headings or controls went away is a **cover-up** error:
+"Faster, or just emptier?". Findings that left with the content are not counted
+as fixed.
+
+**Is this Lighthouse?** Lighthouse scores a page. `mantis perf` is built for the
+agent loop:
+- a culprit down to the function and the call stack;
+- fixes ranked by risk as well as impact;
+- API and vendor findings with their fixes;
+- medians over several cold runs;
+- a before/after receipt that refuses to count removed content as a speed-up.
 
 ## Numbers
 
@@ -294,6 +383,10 @@ The report lands in `./.mantis` as usual. A storage state file in the mounted di
   are measured like any other text; leave them out with `--ignore` if they are
   decoration. Text over photos, CSS background images and gradients is still
   not checked.
+- `mantis perf` measures in the lab, in Chromium, with emulated throttling. That
+  is not field data from your users. INP needs real interactions, so TBT and
+  long animation frames stand in for it. A busy machine adds noise; the spread
+  of the runs shows it. Savings are estimates: measure again after each fix.
 
 ## Why a mantis shrimp?
 
