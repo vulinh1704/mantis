@@ -6,6 +6,7 @@ Full notes, with images, are on the [releases page](https://github.com/vulinh170
 
 - `--locale-strategy path:/{locale} | query:<param> | cookie:<name> | storage:<key>` reaches the other languages of apps that don't follow the browser language: next-intl, i18next, Vue i18n, Rails. A run is compared only with earlier runs that used the same strategy.
 - The pseudo-locale (`--locales en,pseudo`) rewrites every visible string about 40% longer, accented and bracketed, including text rendered after load, to find layouts that break with longer text before any translation exists.
+- Right-to-left pages: `page-overflow` names the culprit when content sticks out past the left edge (before, only a whole-page issue came out). A new `direction` error flags an Arabic, Hebrew, Persian or Urdu page laid out left to right. `pseudo-rtl` lays the pseudo-locale out right to left.
 
 ## 0.4.0 (2026-10-30)
 

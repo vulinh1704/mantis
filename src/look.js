@@ -9,7 +9,7 @@ import { renderContactSheet } from './contact-sheet.js';
 import { CELL_DETECTORS, CROSS_DETECTORS } from './detectors/index.js';
 import { installMantisLib } from './inpage/lib.js';
 import { collectState } from './inpage/state.js';
-import { PSEUDO_LOCALE, UsageError, baseLocale, formatDarkStrategy, formatLocaleStrategy, readStorageState, routeSlug } from './options.js';
+import { UsageError, baseLocale, formatDarkStrategy, formatLocaleStrategy, isPseudoLocale, readStorageState, routeSlug } from './options.js';
 import {
   applyDarkStrategy,
   applyLocaleStrategy,
@@ -163,7 +163,7 @@ async function runCell(browser, opts, cell, baseline, targets, session, log) {
   try {
     for (const d of CELL_DETECTORS) if (d.setup) await d.setup(page, ctx);
     if (opts.localeStrategy) await applyLocaleStrategy(context, cell.url, cell.browserLocale ?? cell.locale, opts.localeStrategy);
-    if (cell.locale === PSEUDO_LOCALE) await installPseudoLocale(context);
+    if (isPseudoLocale(cell.locale)) await installPseudoLocale(context, { rtl: cell.locale === 'pseudo-rtl' });
 
     let response;
     try {

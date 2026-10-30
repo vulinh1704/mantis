@@ -12,6 +12,9 @@
  *   masking rule as evidence. Only culprits that start inside the viewport and carry text, a
  *   control or media count; aria-hidden decoration, transformed layers (carousels, off-canvas
  *   drawers) and anything clipped by a smaller container are left alone.
+ *
+ * Right-to-left pages (Arabic, Hebrew, Persian…) start at the right edge and overflow to the left,
+ * so for them every "past the edge" test is mirrored: a culprit's left edge passes x = 0.
  */
 export default {
   name: 'page-overflow',
@@ -45,7 +48,10 @@ export default {
       const scrolls = docWidth > vw + 1 && !viewportMask;
       if (!scrolls && !viewportMask && roots.size === 0) return [];
 
-      const limit = vw + 1;
+      const rtl = bs.direction === 'rtl';
+      // How far a box (viewport rect) sticks out past the end edge, and whether it starts on screen.
+      const past = (r) => (rtl ? -(r.left + scrollX) : r.right + scrollX - vw);
+      const startsInside = (r) => (rtl ? r.right + scrollX > 1 : r.left + scrollX < vw - 1);
       const xClip = (s) => s.overflowX !== 'visible' || /paint|strict|content/.test(s.contain || '');
       // 'clipped' by a container, cut by a mask ({selector, value}), or 'none' (sticks out for real).
       const clipOf = (el) => {
@@ -70,7 +76,7 @@ export default {
       const marquee = (el) => typeof el.getAnimations === 'function' &&
         el.getAnimations({ subtree: true }).some((a) => a.effect && a.effect.getComputedTiming().iterations === Infinity);
       // A masked culprit only matters when the user would see it cut: it starts on screen and has content.
-      const visiblyCut = (el, r) => r.left + scrollX < vw - 1 && !M.ariaHidden(el) && !transformed(el) && !marquee(el) && hasContent(el);
+      const visiblyCut = (el, r) => startsInside(r) && !M.ariaHidden(el) && !transformed(el) && !marquee(el) && hasContent(el);
 
       const over = new Set();
       const culprits = [];
@@ -80,12 +86,12 @@ export default {
         if (skip.has(el.localName) || M.inOverlay(el)) continue;
         if (M.ignored(el)) {
           const r = el.getBoundingClientRect();
-          if (r.right + scrollX > limit) ignoredCulprit = true;
+          if (past(r) > 1) ignoredCulprit = true;
           continue;
         }
         const r = el.getBoundingClientRect();
         if (r.width === 0 && r.height === 0) continue;
-        if (r.right + scrollX <= limit) continue;
+        if (past(r) <= 1) continue;
         if (M.layerKind(el) === 'fixed' || M.visuallyHidden(el)) continue;
         const clip = el === body ? viewportMask || 'none' : clipOf(el);
         if (clip === 'clipped' || (clip === 'none' && !scrolls)) continue;
@@ -104,7 +110,7 @@ export default {
           if (clip === 'clipped' || (clip === 'none' && !scrolls)) continue;
           if (clip !== 'none' && (M.ariaHidden(owner) || transformed(owner))) continue;
           const rects = M.textRects(t);
-          if (rects.some((r) => r.right + scrollX > limit && (clip === 'none' || r.left + scrollX < vw - 1))) {
+          if (rects.some((r) => past(r) > 1 && (clip === 'none' || startsInside(r)))) {
             if (!culprits.some((c) => c.el === owner)) culprits.push({ el: owner, mask: clip === 'none' ? null : clip });
             if (culprits.length >= 5) break;
           }
@@ -121,7 +127,8 @@ export default {
           documentWidth: docWidth,
           right: Math.round(r.right + scrollX),
           width: Math.round(r.width),
-          overflowBy: Math.round(r.right + scrollX - vw),
+          overflowBy: Math.round(past(r)),
+          ...(rtl ? { direction: 'rtl', edge: 'left' } : {}),
           cssWidth: s.width,
           minWidth: s.minWidth,
           whiteSpace: s.whiteSpace,
@@ -129,6 +136,7 @@ export default {
           ...(mask ? { maskedBy: mask.selector, maskValue: mask.value } : {}),
         };
       };
+      const side = rtl ? 'left edge (right-to-left page)' : 'right edge';
       const masked = (mask) => (mask ? `; \`${mask.selector} { overflow-x: ${mask.value} }\` only hides the part that is cut off` : ', so the page scrolls horizontally');
 
       if (culprits.length === 0) {
@@ -136,9 +144,9 @@ export default {
           type: 'page-overflow',
           severity: 'error',
           selector: 'html',
-          rect: { x: vw, y: 0, width: Math.max(1, docWidth - vw), height: Math.min(html.scrollHeight, 2000) },
+          rect: { x: rtl ? vw - docWidth : vw, y: 0, width: Math.max(1, docWidth - vw), height: Math.min(html.scrollHeight, 2000) },
           message: `The page is ${docWidth}px wide in a ${vw}px viewport and scrolls horizontally, but no single element could be blamed (check pseudo-elements and negative margins).`,
-          evidence: { viewportWidth: vw, documentWidth: docWidth },
+          evidence: { viewportWidth: vw, documentWidth: docWidth, ...(rtl ? { direction: 'rtl' } : {}) },
         });
         return issues;
       }
@@ -154,17 +162,16 @@ export default {
       for (const [parent, list] of byParent) {
         if (list.length >= 2 && parent !== body && parent !== html) {
           const mask = list[0].mask;
-          const maxRight = Math.max(...list.map((c) => c.el.getBoundingClientRect().right + scrollX));
           const sel = M.cssPath(parent);
           const ev = evidenceFor(parent, mask);
-          ev.overflowBy = Math.round(maxRight - vw);
+          ev.overflowBy = Math.round(Math.max(...list.map((c) => past(c.el.getBoundingClientRect()))));
           ev.children = list.slice(0, 6).map((c) => M.cssPath(c.el));
           issues.push({
             type: 'page-overflow',
             severity: 'error',
             selector: sel,
             rect: M.round(M.docRect(parent)),
-            message: `${list.length} children of \`${sel}\` extend up to ${ev.overflowBy}px past the ${vw}px viewport${masked(mask)} (white-space: ${ev.whiteSpace}). Let the row wrap or shrink.`,
+            message: `${list.length} children of \`${sel}\` extend up to ${ev.overflowBy}px past the ${side} of the ${vw}px viewport${masked(mask)} (white-space: ${ev.whiteSpace}). Let the row wrap or shrink.`,
             evidence: ev,
           });
         } else {
@@ -176,7 +183,7 @@ export default {
               severity: 'error',
               selector: sel,
               rect: M.round(M.docRect(el)),
-              message: `\`${sel}\` is ${ev.width}px wide and extends ${ev.overflowBy}px past the ${vw}px viewport${masked(mask)}.`,
+              message: `\`${sel}\` is ${ev.width}px wide and extends ${ev.overflowBy}px past the ${side} of the ${vw}px viewport${masked(mask)}.`,
               evidence: ev,
             });
           }

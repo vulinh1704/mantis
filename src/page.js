@@ -77,11 +77,25 @@ export async function applyLocaleStrategy(context, url, locale, strategy) {
  * app re-renders, each visible string becomes accented, about 40% longer and bracketed
  * ("Settings" -> "[Šééţţţîññĝšš]"), the way real translations grow. The brackets show when the
  * start or the end of a string gets cut. Code, scripts, form fields the user types in and
- * `translate="no"` content are left alone.
+ * `translate="no"` content are left alone. With `rtl` the page is also laid out right to left
+ * (`<html dir="rtl">`, kept even if the app sets it back), as Arabic or Hebrew would be.
  * @param {import('playwright').BrowserContext} context
+ * @param {{rtl?: boolean}} [opts]
  */
-export async function installPseudoLocale(context) {
-  await context.addInitScript(() => {
+export async function installPseudoLocale(context, { rtl = false } = {}) {
+  await context.addInitScript(({ rtl }) => {
+    if (rtl) {
+      const setDir = () => {
+        const root = document.documentElement;
+        if (root && root.getAttribute('dir') !== 'rtl') root.setAttribute('dir', 'rtl');
+      };
+      setDir();
+      new MutationObserver(setDir).observe(document, { childList: true, subtree: false });
+      document.addEventListener('DOMContentLoaded', () => {
+        setDir();
+        new MutationObserver(setDir).observe(document.documentElement, { attributes: true, attributeFilter: ['dir'] });
+      });
+    }
     const MAP = {
       a: 'á', b: 'ƀ', c: 'ç', d: 'ð', e: 'é', f: 'ƒ', g: 'ĝ', h: 'ĥ', i: 'î', j: 'ĵ', k: 'ķ', l: 'ļ', m: 'ɱ',
       n: 'ñ', o: 'ö', p: 'þ', q: 'ǫ', r: 'ŕ', s: 'š', t: 'ţ', u: 'û', v: 'ṽ', w: 'ŵ', x: 'ẋ', y: 'ý', z: 'ž',
@@ -148,7 +162,7 @@ export async function installPseudoLocale(context) {
       }
     }).observe(document, { childList: true, subtree: true, characterData: true });
     document.addEventListener('DOMContentLoaded', () => document.body && fixElement(document.body));
-  });
+  }, { rtl });
 }
 
 /** Collect network results and keep an in-flight counter so we can wait for quiet. */

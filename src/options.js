@@ -208,15 +208,17 @@ function parseIntOpt(name, value, min, max) {
 const LOCALE_RE = /^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$/;
 
 /**
- * The pseudo-locale: the base language's page with every visible string accented, about 40% longer
+ * The pseudo-locales: the base language's page with every visible string accented, about 40% longer
  * and bracketed, to find layouts that break when text gets longer before any translation exists.
+ * `pseudo-rtl` also lays the page out right to left, for apps that will ship Arabic or Hebrew.
  */
-export const PSEUDO_LOCALE = 'pseudo';
+export const PSEUDO_LOCALES = Object.freeze(['pseudo', 'pseudo-rtl']);
+export const isPseudoLocale = (locale) => PSEUDO_LOCALES.includes(locale);
 
-/** The real locale a cell loads: itself, or for the pseudo-locale the first real one (else en). */
+/** The real locale a cell loads: itself, or for a pseudo-locale the first real one (else en). */
 export function baseLocale(locale, locales) {
-  if (locale !== PSEUDO_LOCALE) return locale;
-  return locales.find((l) => l !== PSEUDO_LOCALE) ?? 'en';
+  if (!isPseudoLocale(locale)) return locale;
+  return locales.find((l) => !isPseudoLocale(l)) ?? 'en';
 }
 
 /**
@@ -312,7 +314,7 @@ export function parseLookArgs(argv) {
   const locales = values.locales !== undefined ? splitList(values.locales) : [...LOOK_DEFAULTS.locales];
   if (locales.length === 0) throw new UsageError('--locales is empty');
   for (const l of locales) {
-    if (l !== PSEUDO_LOCALE && !LOCALE_RE.test(l)) throw new UsageError(`invalid locale "${l}" (use BCP 47 tags like en, vi, de-DE, or ${PSEUDO_LOCALE})`);
+    if (!isPseudoLocale(l) && !LOCALE_RE.test(l)) throw new UsageError(`invalid locale "${l}" (use BCP 47 tags like en, vi, de-DE, or ${PSEUDO_LOCALES.join(', ')})`);
   }
 
   return {
