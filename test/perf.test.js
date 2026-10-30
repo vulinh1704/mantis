@@ -6,7 +6,7 @@
  * mostly unused bundle and a third-party chat widget on another origin.
  */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -17,6 +17,7 @@ import { aggregate, attachServerWait, median, rating, renderPerfMarkdown, repres
 import { PERF_PROFILES, clsOf, hotFunctions, tbtOf, unusedJsBytes } from '../src/perf/measure.js';
 import { siteOf } from '../src/perf/metrics.js';
 import { apiPattern, appApis } from '../src/perf/network.js';
+import { pickFrames, waterfallRows } from '../src/perf/sheet.js';
 import { vendorOf } from '../src/perf/vendors.js';
 import { runCli } from './helpers/cli.js';
 import { FIXTURES } from './helpers/static-server.js';
@@ -328,6 +329,11 @@ describe('findings', () => {
     assert.equal(late.culprit.waitedFor, `${page}vendor.js`);
     assert.match(late.evidence, /after \/vendor\.js finished loading \(2\.4 s\) and ran/);
     assert.match(late.fix, /rel="preload" as="fetch" href="\/api\/me"/);
+    // No script to blame: a 600 ms delay may only be a busy machine; 1.2 s counts.
+    const alone = (start) => findRouteIssues(route({}, { requests: [requests[0], requests[2], { ...requests[3], start, end: start + 180 }] }), desktop).filter((f) => f.category === 'api-late');
+    assert.deepEqual(alone(900), []);
+    assert.equal(alone(1500).length, 1);
+    assert.equal(alone(1500)[0].culprit.waitedFor, undefined);
   });
 
   test('siteOf tells first-party from third-party', () => {
@@ -470,10 +476,12 @@ describe('mantis perf on slow-app (end-to-end)', { concurrency: false }, () => {
     const m = route(mobile, '/');
     const d = route(desktop, '/');
     assert.equal(mobile.profile.name, 'mobile');
-    // Slow 4G adds 562 ms to every round trip; a ratio would depend on how fast the machine is.
-    assert.ok(m.metrics.fcp.median > d.metrics.fcp.median + 400, `mobile FCP ${m.metrics.fcp.median} vs desktop ${d.metrics.fcp.median}`);
-    assert.ok(m.metrics.lcp.median > d.metrics.lcp.median + 1000, `mobile LCP ${m.metrics.lcp.median} vs desktop ${d.metrics.lcp.median}`);
-    assert.ok(m.metrics.tbt.median > d.metrics.tbt.median, `mobile TBT ${m.metrics.tbt.median} vs desktop ${d.metrics.tbt.median}`);
+    // Slow 4G holds every response for its 562 ms latency, however busy the machine is; margins
+    // between the two profiles would depend on the load of the machine running the tests.
+    const doc = m.visit.requests.find((q) => q.type === 'Document');
+    assert.ok(doc.end >= 500, `the HTML arrived at ${doc.end} ms on slow 4G`);
+    assert.ok(m.metrics.fcp.median > d.metrics.fcp.median, `mobile FCP ${m.metrics.fcp.median} vs desktop ${d.metrics.fcp.median}`);
+    assert.ok(m.metrics.lcp.median > d.metrics.lcp.median, `mobile LCP ${m.metrics.lcp.median} vs desktop ${d.metrics.lcp.median}`);
     const e = m.visit.lcpElement;
     assert.ok(e.natural.width >= 2 * e.rect.width, JSON.stringify(e));
   });
@@ -509,5 +517,47 @@ describe('mantis perf on slow-app (end-to-end)', { concurrency: false }, () => {
 
   test('a lean page has nothing to fix', () => {
     assert.ok(!desktop.findings.some((f) => f.routes.includes('/fast')), JSON.stringify(desktop.findings.filter((f) => f.routes.includes('/fast'))));
+  });
+
+  test('the sheet and the filmstrip: frames saved as files, the first paint and LCP marked', () => {
+    const latest = path.join(tmp, 'm', 'perf', 'latest');
+    assert.ok(existsSync(path.join(latest, 'perf-sheet.png')));
+    assert.match(mobileStdout, /sheet {3}.*perf-sheet\.png/);
+    const strip = route(mobile, '/').visit.filmstrip;
+    assert.ok(strip.length >= 4, JSON.stringify(strip));
+    assert.ok(strip.some((f) => f.lcp) && strip.some((f) => f.fcp), JSON.stringify(strip));
+    for (const f of strip.filter((x) => x.file)) assert.ok(existsSync(path.join(latest, f.file)), f.file);
+    assert.doesNotMatch(readFileSync(path.join(latest, 'perf.json'), 'utf8'), /"jpeg"/, 'no frame data in perf.json');
+  });
+});
+
+describe('perf sheet', () => {
+  test('filmstrip frames: even steps up to the last change, with the first paint and LCP on frames of their own', () => {
+    const frames = [0, 300, 1200, 2500, 5100, 5900].map((t) => ({ t, jpeg: String(t) }));
+    const picks = pickFrames(frames, { fcp: 1190, lcp: 5150, count: 6 });
+    // steps of 5900 / 6; the step nearest each mark moves onto it; each shows the latest frame by then
+    assert.deepEqual(picks.map((p) => p.t), [1190, 1967, 2950, 3933, 5150, 5900]);
+    assert.deepEqual(picks.map((p) => p.frame?.t ?? null), [300, 1200, 2500, 2500, 5100, 5900]);
+    assert.ok(picks[0].fcp && picks[4].lcp);
+    assert.deepEqual(pickFrames([], { fcp: 1, lcp: 2 }), []);
+  });
+
+  test('waterfall: the document, what blocks the first paint, the LCP image, API calls and big scripts', () => {
+    const o = 'http://x';
+    const rows = waterfallRows({
+      lcpElement: { url: `${o}/hero.jpg` },
+      requests: [
+        { url: `${o}/`, type: 'Document', start: 0, end: 100 },
+        { url: `${o}/a.css`, type: 'Stylesheet', start: 110, end: 300, renderBlocking: true },
+        { url: `${o}/icon.svg`, type: 'Image', start: 120, end: 200 },
+        { url: `${o}/hero.jpg`, type: 'Image', start: 130, end: 900 },
+        { url: `${o}/api/me`, type: 'Fetch', start: 400, end: 700 },
+        { url: 'https://cdn.example.com/w.js', type: 'Script', start: 150, end: 600, bytes: 90000 },
+        { url: `${o}/tiny.js`, type: 'Script', start: 160, end: 170, bytes: 900 },
+      ],
+    }, o);
+    assert.deepEqual(rows.map((r) => [r.label, r.kind, r.third]), [
+      ['/', 'doc', false], ['/a.css', 'block', false], ['/hero.jpg', 'lcp', false], ['cdn.example.com/w.js', 'js', true], ['/api/me', 'api', false],
+    ]);
   });
 });

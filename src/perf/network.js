@@ -59,16 +59,17 @@ export function networkChecks(r, profile, add) {
   const metricFor = (q) => (critical(q) ? 'lcp' : 'data');
 
   // The first call starts late: the code that makes it waited (deferred scripts run in document order).
+  // Without a script to blame, only a long wait counts: a busy machine alone can delay a script.
   const docEnd = v.requests.find((q) => q.type === 'Document')?.end ?? 0;
   const first = [...apis].sort((a, b) => a.start - b.start)[0];
   const caller = first?.initiator?.url ? v.requests.find((q) => q.url === first.initiator.url && q.type === 'Script') : null;
-  if (first && caller?.end != null && first.start - Math.max(docEnd, caller.end) >= 300) {
-    const ready = Math.max(docEnd, caller.end);
-    // The script that finished loading last before the call, well after the caller did: the gap up
-    // to the call is the time to parse and run it, which a slow CPU makes long.
-    const blocker = v.requests
-      .filter((q) => q !== caller && q.type === 'Script' && q.end != null && q.end <= first.start + 5 && first.start - q.end <= 1000 && q.end > caller.end + 200)
-      .sort((a, b) => b.end - a.end)[0];
+  const ready = caller?.end != null ? Math.max(docEnd, caller.end) : null;
+  // The script that finished loading last before the call, well after the caller did: the gap up
+  // to the call is the time to parse and run it, which a slow CPU makes long.
+  const blocker = ready == null ? null : v.requests
+    .filter((q) => q !== caller && q.type === 'Script' && q.end != null && q.end <= first.start + 5 && first.start - q.end <= 1000 && q.end > caller.end + 200)
+    .sort((a, b) => b.end - a.end)[0];
+  if (ready != null && first.start - ready >= (blocker ? 300 : 1000)) {
     add({
       category: 'api-late', key: shortUrl(caller.url, origin), metric: metricFor(first), savings: { ms: Math.round(first.start - ready) }, confidence: 'estimated',
       title: `The first API call starts at ${fmtMs(first.start)}, ${fmtMs(first.start - ready)} after the code that makes it arrived`,

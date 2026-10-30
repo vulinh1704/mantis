@@ -7,12 +7,14 @@ import { cp, mkdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { launchBrowser, preflight } from '../look.js';
 import { readStorageState, storageStateName } from '../options.js';
+import { projectInfo } from '../project.js';
 import { VERSION, ensureOutDir, firstLine, runIdFor, uniqueDir } from '../util.js';
 import { METRIC_NAME, comparePerf, fmtMetric, findPerfBaseline } from './compare.js';
 import { BUCKETS, findRouteIssues, rankFindings, savingLabel } from './findings.js';
 import { PERF_PROFILES, measureTrace, measureVisit } from './measure.js';
 import { fmtKb, fmtMs, median, rating, shortUrl } from './metrics.js';
 import { dataReady } from './network.js';
+import { pickFrames, renderPerfSheet } from './sheet.js';
 
 export { THRESHOLDS, fmtKb, fmtMs, median, rating, shortUrl } from './metrics.js';
 
@@ -70,6 +72,7 @@ export async function perf(opts, { log = () => {} } = {}) {
   try {
     await preflight(browser, new URL(opts.routes[0], opts.baseUrl).href, session);
     const routes = [];
+    const frames = new Map();
     for (const route of opts.routes) {
       const url = new URL(route, opts.baseUrl).href;
       const visits = [];
@@ -98,6 +101,7 @@ export async function perf(opts, { log = () => {} } = {}) {
       const metrics = aggregate(visits);
       const rep = visits[representative(visits, metrics)];
       if (rep.devSigns.length) notes.unshift(`Measured a development server (${rep.devSigns.join(', ')}): its numbers are not what users get. Measure a production build (npm run build && npm run preview, next start…).`);
+      frames.set(route, pickFrames(rep.filmstrip, { fcp: rep.fcp, lcp: rep.lcp }));
       routes.push({
         route,
         url,
@@ -105,7 +109,7 @@ export async function perf(opts, { log = () => {} } = {}) {
         metrics,
         framework: rep.framework,
         devServer: rep.devSigns.length > 0,
-        visit: { ...rep, requests: attachServerWait(rep.requests, trace.requests), coverage: trace.coverage, hotFunctions: trace.hotFunctions, scriptTime: trace.scriptTime },
+        visit: { ...rep, filmstrip: [], requests: attachServerWait(rep.requests, trace.requests), coverage: trace.coverage, hotFunctions: trace.hotFunctions, scriptTime: trace.scriptTime },
         notes,
       });
     }
@@ -133,6 +137,13 @@ export async function perf(opts, { log = () => {} } = {}) {
     await ensureOutDir(outDir);
     const runDir = await uniqueDir(path.join(outDir, 'perf', 'runs'), runIdFor(startedAt));
     report.runId = path.basename(runDir);
+    await writeFilmstrips(runDir, routes, frames);
+    let sheet = null;
+    try {
+      sheet = await renderPerfSheet(browser, report, runDir, projectInfo());
+    } catch (err) {
+      log(`perf sheet failed: ${firstLine(err.message)}`);
+    }
     await writeFile(path.join(runDir, 'perf.json'), JSON.stringify(report, null, 2) + '\n');
     await writeFile(path.join(runDir, 'perf.md'), renderPerfMarkdown(report));
     const latestDir = path.join(outDir, 'perf', 'latest');
@@ -141,9 +152,36 @@ export async function perf(opts, { log = () => {} } = {}) {
     await cp(runDir, latestDir, { recursive: true });
     const failed = routes.some((r) => r.status === 'failed');
     const coverUps = report.baseline?.coverUps.length ?? 0;
-    return { report, runDir, latestDir, exitCode: failed ? 2 : counts['do-first'] + counts.plan + coverUps > 0 ? 1 : 0 };
+    return { report, runDir, latestDir, sheet: sheet && path.join(latestDir, path.basename(sheet)), exitCode: failed ? 2 : counts['do-first'] + counts.plan + coverUps > 0 ? 1 : 0 };
   } finally {
     await browser.close().catch(() => {});
+  }
+}
+
+/**
+ * Save each route's filmstrip frames as `filmstrip/<route #>-<frame #>.jpg` and keep only their
+ * times and files in the report.
+ */
+async function writeFilmstrips(runDir, routes, frames) {
+  const dir = path.join(runDir, 'filmstrip');
+  for (const [i, r] of routes.entries()) {
+    const picks = frames.get(r.route);
+    if (!r.visit || !picks?.length) continue;
+    await mkdir(dir, { recursive: true });
+    const files = new Map();
+    r.visit.filmstrip = [];
+    for (const p of picks) {
+      let file = null;
+      if (p.frame) {
+        file = files.get(p.frame);
+        if (!file) {
+          file = `filmstrip/${i + 1}-${files.size + 1}.jpg`;
+          await writeFile(path.join(runDir, file), Buffer.from(p.frame.jpeg, 'base64'));
+          files.set(p.frame, file);
+        }
+      }
+      r.visit.filmstrip.push({ t: p.t, file, fcp: p.fcp, lcp: p.lcp });
+    }
   }
 }
 
