@@ -10,7 +10,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { after, before, describe, test } from 'node:test';
 import { commentBody, marker, pullRequestOf } from '../action/comment.mjs';
-import { lookSummary, mantisArgs, perfSummary } from '../action/run.mjs';
+import { lookSummary, mantisArgs, perfSummary, short } from '../action/run.mjs';
 import { BIN, ROOT } from './helpers/cli.js';
 import { FIXTURES, startStaticServer } from './helpers/static-server.js';
 
@@ -41,6 +41,13 @@ describe('action: pieces', () => {
     assert.ok(md.indexOf('page-overflow') < md.indexOf('tap-target'), 'errors first');
     assert.match(md, /`\.row\\\|wide`/, 'pipes in selectors are escaped');
     assert.match(md, /mobile\/light\/en, mobile\/dark\/en, tablet\/light\/en \+1/);
+    assert.match(lookSummary({ summary: { errors: 0, warnings: 0, cells: 1 }, issues: [] }, { url: 'http://x/' }), /^### 🟢 Mantis look: 0 errors, 0 warnings in 1 cell$/m);
+  });
+
+  test('long messages are cut at a word, never inside a code span', () => {
+    assert.equal(short('short', 10), 'short');
+    assert.equal(short('Likely cause: `#hero-art` (185px tall, <img> without width and height)', 50), 'Likely cause: `#hero-art` (185px tall, <img> …');
+    assert.equal(short('moved by `a very long selector name here`', 30), 'moved by …');
   });
 
   test('the perf summary: metrics, receipt, cover-ups and the first fixes', () => {
