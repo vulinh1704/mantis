@@ -73,6 +73,9 @@ Then someone opens the page on a phone:
    mode off, and the next run checks that it didn't.
 3. **Prove.** `/mantis-proof` makes a before/after sheet, a close-up of one
    fixed finding, and optionally a video, for your pull request.
+4. **Speed.** `/mantis-perf` measures the page like a phone on slow 4G, fixes
+   what slows it down in order of impact and risk, and checks that the page got
+   faster, not emptier (see [below](#faster-or-just-emptier-mantis-perf-from-v06)).
 
 ```bash
 mantis look http://localhost:3000 --routes /,/settings --locales en,vi

@@ -40,12 +40,25 @@ looks right" is not evidence. A Mantis run with zero errors is.
 mantis look http://localhost:3000 --routes /,/settings
 ```
 
-If `mantis` isn't installed, run `npx -y @vulinh1704/mantis@0.4.0 look …` instead.
+If `mantis` isn't installed, run `npx -y @vulinh1704/mantis@0.6.0 look …` instead.
 Without Node or a browser, use the Docker image (`ghcr.io/vulinh1704/mantis`, see the
 README for how it reaches a dev server on the host).
 
 - `--locales en,vi` when the app has translations. Longer languages (Vietnamese,
   German) break layouts that look fine in English.
+- `--locale-strategy` when the app doesn't follow the browser language (the report
+  says a locale is "not localized"). Check how the app switches language first:
+  `path:/{locale}` (`/vi/settings`), `query:lang`, `cookie:NEXT_LOCALE` (next-intl)
+  or `storage:i18nextLng` (i18next).
+- `--locales en,pseudo` when the app has no translations yet (or one language
+  only). The pseudo cell shows every string about 40% longer, accented and
+  bracketed; cut or overflowing text there will break in real translations. Fix it
+  the same way (let the box grow or wrap), never by shortening the pseudo text.
+- `--locales en,pseudo-rtl` when the app will ship Arabic, Hebrew or Persian but
+  doesn't yet: the pseudo text laid out right to left. Overflow on the left and
+  controls stuck to the wrong side usually come from physical CSS (`margin-left`,
+  `left:`, `text-align: left`); fix them with logical properties
+  (`margin-inline-start`, `inset-inline-start`, `text-align: start`).
 - `--dark-strategy class:dark` or `--dark-strategy attr:data-theme=dark` when dark
   mode is a class or attribute toggle rather than the OS setting. Check how the app
   switches themes before choosing.
@@ -94,7 +107,8 @@ check.
   with a design skill for taste.
 - It doesn't click through flows or test hover and focus states yet. Visit a route
   that shows the menu or dialog you changed, or say it was not checked.
-- It doesn't measure animation smoothness.
+- It doesn't measure animation smoothness. For load speed (LCP, blocking time,
+  slow API calls, third parties), use the **mantis-perf** skill.
 - Contrast on canvas apps and under transparent layers is read from the
   screenshot. Text over photos, CSS background images and gradients is not
   checked: look at those yourself.
