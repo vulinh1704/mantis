@@ -40,7 +40,7 @@ export const PERF_PROFILES = Object.freeze({
 
 /** Runs in the page before any of its scripts: keeps every performance entry Mantis needs. */
 function perfInitScript() {
-  const P = { lcp: [], shifts: [], longtasks: [], loafs: [], fcp: null, lcpElement: null, added: [], loaded: [], fontsDone: [] };
+  const P = { lcp: [], shifts: [], longtasks: [], loafs: [], fcp: null, added: [], loaded: [], fontsDone: [] };
   window.__mantisPerf = P;
   // What could have caused a layout shift: elements inserted after parsing, images and fonts arriving.
   let parsed = false;
@@ -54,9 +54,15 @@ function perfInitScript() {
     if (e.target.localName === 'img' && P.loaded.length < 500) P.loaded.push({ t: performance.now(), node: e.target });
   }, true);
   document.fonts?.addEventListener?.('loadingdone', () => P.fontsDone.push(performance.now()));
+  // Observers deliver their entries in a later task, which a busy machine can delay past the moment
+  // Mantis reads them: P.flush() takes what is still queued (takeRecords) before reading.
+  const observers = [];
+  P.flush = () => observers.forEach(({ po, fn }) => po.takeRecords().forEach(fn));
   const observe = (type, fn) => {
     try {
-      new PerformanceObserver((list) => list.getEntries().forEach(fn)).observe({ type, buffered: true });
+      const po = new PerformanceObserver((list) => list.getEntries().forEach(fn));
+      po.observe({ type, buffered: true });
+      observers.push({ po, fn });
     } catch {
       // entry type not supported by this browser
     }
@@ -65,8 +71,7 @@ function perfInitScript() {
     if (e.name === 'first-contentful-paint') P.fcp = e.startTime;
   });
   observe('largest-contentful-paint', (e) => {
-    P.lcp.push({ t: e.renderTime || e.loadTime || e.startTime, size: e.size, url: e.url || null });
-    P.lcpElement = e.element || P.lcpElement;
+    P.lcp.push({ t: e.renderTime || e.loadTime || e.startTime, size: e.size, url: e.url || null, element: e.element || null });
   });
   observe('layout-shift', (e) => {
     if (e.hadRecentInput) return;
@@ -214,6 +219,7 @@ async function recordFilmstrip(cdp, profile) {
 function collectInPage() {
   const M = window.__mantis;
   const P = window.__mantisPerf || { lcp: [], shifts: [], longtasks: [], loafs: [] };
+  P.flush?.();
   const nav = performance.getEntriesByType('navigation')[0];
   const sel = (el) => {
     try {
@@ -222,8 +228,9 @@ function collectInPage() {
       return null;
     }
   };
-  const lastLcp = P.lcp[P.lcp.length - 1] || null;
-  const lcpEl = P.lcpElement;
+  // LCP is the largest candidate: the biggest entry, the latest of equal ones, with an element.
+  const lastLcp = P.lcp.reduce((best, e) => (!best || e.size >= best.size ? e : best), null);
+  const lcpEl = lastLcp?.element ?? [...P.lcp].reverse().find((e) => e.element)?.element ?? null;
   let lcpElement = null;
   if (lcpEl) {
     const r = lcpEl.getBoundingClientRect();
@@ -242,6 +249,25 @@ function collectInPage() {
       rect: { width: Math.round(r.width), height: Math.round(r.height) },
       natural: isImg ? { width: lcpEl.naturalWidth, height: lcpEl.naturalHeight } : null,
     };
+  }
+  // Chrome now and then emits no LCP entry for an image it did paint (seen in 1 of 5 desktop visits
+  // on a CI runner). Such an image loaded after the last candidate, is on screen and much larger.
+  // Images Chrome leaves out on purpose are skipped: low entropy (placeholders), covering the whole
+  // viewport (backgrounds), or transparent.
+  let lcpMissed = null;
+  const lcpSize = lastLcp?.size ?? 0;
+  for (const l of P.loaded) {
+    const img = l.node;
+    if (!img.isConnected || !img.naturalWidth || l.t <= (lastLcp?.t ?? 0)) continue;
+    const r = img.getBoundingClientRect();
+    const w = Math.max(0, Math.min(r.right, innerWidth) - Math.max(r.left, 0));
+    const h = Math.max(0, Math.min(r.bottom, innerHeight) - Math.max(r.top, 0));
+    if (w >= innerWidth && h >= innerHeight) continue;
+    if (Number(getComputedStyle(img).opacity) === 0) continue;
+    const area = Math.min(w * h, img.naturalWidth * img.naturalHeight);
+    const bytes = performance.getEntriesByName(img.currentSrc)[0]?.encodedBodySize ?? 0;
+    if (bytes && (bytes * 8) / (w * h) < 0.05) continue;
+    if (area > lcpSize * 1.5 && (!lcpMissed || area > lcpMissed.area)) lcpMissed = { selector: sel(img), loadedAt: Math.round(l.t), area: Math.round(area) };
   }
   // The likeliest cause of each layout shift, above the elements that moved. Candidates: an element
   // inserted (or a container filled) or an image loaded in the second before it, and any image with
@@ -346,6 +372,9 @@ function collectInPage() {
     fcp: P.fcp != null ? Math.round(P.fcp) : null,
     lcp: lastLcp ? Math.round(lastLcp.t) : null,
     lcpElement,
+    lcpMissed,
+    // every candidate Chrome reported, in order: the LCP is the largest
+    lcpCandidates: P.lcp.slice(-10).map((e) => ({ t: Math.round(e.t), size: e.size, url: e.url, tag: e.element?.localName ?? null })),
     shifts: P.shifts.map((s) => ({ t: Math.round(s.t), value: s.value, sources: s.nodes.map(sel).filter(Boolean).slice(0, 4), cause: causeOf(s) })),
     fonts: document.fonts ? [...document.fonts].map((f) => ({ family: f.family.replace(/^["']|["']$/g, ''), display: f.display, status: f.status })) : [],
     fontRules: fontFaceRules(),
