@@ -330,6 +330,44 @@ If the app only keeps a flag in localStorage (onboarding done, a demo session), 
 
 The file holds a live session, so keep it out of git. Inside `.mantis/` it already is: Mantis writes a `.gitignore` there. `proof --video` takes the same flag. A run is only compared with earlier runs that used a storage state file of the same name.
 
+## On every pull request (GitHub Action, from v0.7)
+
+The action checks a pull request's preview deployment and compares it with your live site, which shows what the change fixed, broke or only hid. It posts the result as a pull request comment, updated on every push, and as the job summary. The sheets and screenshots are uploaded as an artifact.
+
+With a host that reports preview deployments to GitHub (Vercel, Netlify, …):
+
+```yaml
+name: Mantis
+on: deployment_status
+permissions:
+  contents: read
+  pull-requests: write
+jobs:
+  look:
+    if: github.event.deployment_status.state == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: vulinh1704/mantis@v0.7.0
+        with:
+          url: ${{ github.event.deployment_status.target_url }}
+          baseline-url: https://your-app.com
+          routes: /,/pricing,/settings
+          locales: en,vi
+```
+
+Or build and serve the app in the job, and point `url` at it (`http://localhost:4173`).
+
+- **`command: perf`** measures speed instead. The comment shows the metrics per route, the receipt against the baseline and the first fixes. A speed-up that only removed content fails the check.
+- **`fail-on`** follows the exit code by default:
+  - `look` fails on any error;
+  - `perf` fails when there is something to do first or to plan;
+  - both fail on a cover-up.
+
+  Set `fail-on: cover-ups` to fail only when a fix hid the problem, or `fail-on: never` to only report.
+- **Inputs:** `routes`, `viewports`, `schemes`, `locales`, `locale-strategy`, `dark-strategy`, `runs`, `profile` and `args` (anything else) map to the CLI's options.
+- **Outputs:** `errors`, `warnings`, `cover-ups`, `exit-code`, `report` and `artifact-url`.
+- **Forks:** a pull request from a fork gets a read-only token. The action then writes the result to the job summary only.
+
 ## Install
 
 > Mantis is in early development (v0.6). Expect rough edges, and please [open an issue](https://github.com/vulinh1704/mantis/issues) when it gets something wrong.
