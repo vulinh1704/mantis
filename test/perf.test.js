@@ -475,7 +475,10 @@ describe('mantis perf on slow-app (end-to-end)', { concurrency: false }, () => {
 
   test('every metric is the median of the runs, with its spread', () => {
     const m = route(desktop, '/').metrics;
-    for (const k of ['lcp', 'fcp', 'tbt', 'cls', 'ttfb', 'bytes', 'requests']) assert.equal(m[k].values.length, 3, k);
+    for (const k of ['fcp', 'tbt', 'cls', 'ttfb', 'bytes', 'requests']) assert.equal(m[k].values.length, 3, k);
+    // LCP leaves out the visits where Chrome missed the hero's entry (1 in 5 on CI), and says so
+    const left = Number(route(desktop, '/').notes.join(' ').match(/no LCP entry for `img\.hero` in (\d) of 3 visits/)?.[1] ?? 0);
+    assert.equal(m.lcp.values.length + left, 3, JSON.stringify(route(desktop, '/').notes));
     assert.equal(desktop.kind, 'perf');
     assert.equal(desktop.profile.name, 'desktop');
   });
