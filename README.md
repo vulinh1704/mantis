@@ -71,7 +71,7 @@ Then someone opens the page on a phone:
 mantis look http://localhost:3000 --routes /,/settings --locales en,vi
 ```
 
-Each language cell sets the browser locale and `Accept-Language`. Many apps pick their language another way, and `--locale-strategy` handles that:
+Each language cell sets the browser locale and `Accept-Language`. Many apps pick their language another way, and `--locale-strategy` handles that (from v0.5):
 
 | The app switches language by | Pass |
 |---|---|
