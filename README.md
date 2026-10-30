@@ -122,6 +122,8 @@ Values far from everything are left alone, since a new illustration color can be
 
 `/mantis-fix` reads `style.json` before it writes CSS and reuses the house values instead of inventing new ones.
 
+Mantis puts a `.gitignore` in `.mantis/`, so reports, screenshots and saved sessions stay out of git. To share the house style with your team, commit it on purpose: `git add -f .mantis/style.json`.
+
 ## Your project on the sheets
 
 The contact sheet and the proof carry your project's name and a link and QR code
@@ -147,7 +149,7 @@ If the app only keeps a flag in localStorage (onboarding done, a demo session), 
 { "cookies": [], "origins": [{ "origin": "http://localhost:3000", "localStorage": [{ "name": "onboarded", "value": "1" }] }] }
 ```
 
-The file holds a live session, so keep it out of git (add `.mantis/` to your `.gitignore`). `proof --video` takes the same flag. A run is only compared with earlier runs that used a storage state file of the same name.
+The file holds a live session, so keep it out of git. Inside `.mantis/` it already is: Mantis writes a `.gitignore` there. `proof --video` takes the same flag. A run is only compared with earlier runs that used a storage state file of the same name.
 
 ## Install
 

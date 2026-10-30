@@ -26,7 +26,7 @@ import {
 import { IssueRegistry, buildReport, renderMarkdown } from './report.js';
 import { projectInfo } from './project.js';
 import { loadStyle } from './style.js';
-import { VERSION, deferred, firstLine, pool, runIdFor, sha1, uniqueDir } from './util.js';
+import { VERSION, deferred, ensureOutDir, firstLine, pool, runIdFor, sha1, uniqueDir } from './util.js';
 
 /** The URL could not be reached at all (exit code 2). */
 export class UnreachableError extends Error {
@@ -273,6 +273,7 @@ export async function look(opts, { log = () => {} } = {}) {
     await preflight(browser, new URL(opts.routes[0], opts.baseUrl).href, session);
 
     const outDir = path.resolve(opts.out);
+    await ensureOutDir(outDir);
     const runDir = await uniqueDir(path.join(outDir, 'runs'), runIdFor(startedAt));
     const runId = path.basename(runDir);
     const shotsDir = path.join(runDir, 'shots');

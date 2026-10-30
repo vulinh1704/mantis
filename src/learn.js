@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { installMantisLib } from './inpage/lib.js';
 import { collectStyle } from './inpage/style.js';
@@ -8,7 +8,7 @@ import { applyDarkStrategy, contextOptions, finishAnimations, fontsReady, nextFr
 import { projectInfo } from './project.js';
 import { buildStyle, renderStyleMarkdown } from './style.js';
 import { renderStyleSheet } from './style-sheet.js';
-import { VERSION, firstLine, pool } from './util.js';
+import { VERSION, ensureOutDir, firstLine, pool } from './util.js';
 
 /** Open one screen and collect the style values it uses. Motion is not reduced, so durations show. */
 async function learnCell(browser, opts, cell, session) {
@@ -78,7 +78,7 @@ export async function learn(opts, { log = () => {} } = {}) {
     for (const r of results.filter((x) => x.error)) style.notes.push(`${r.route} ${r.viewport.name} ${r.scheme} could not be measured: ${r.error}.`);
 
     const outDir = path.resolve(opts.out);
-    await mkdir(outDir, { recursive: true });
+    await ensureOutDir(outDir);
     const files = {
       json: path.join(outDir, 'style.json'),
       md: path.join(outDir, 'style.md'),
