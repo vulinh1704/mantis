@@ -64,14 +64,16 @@ export function networkChecks(r, profile, add) {
   const caller = first?.initiator?.url ? v.requests.find((q) => q.url === first.initiator.url && q.type === 'Script') : null;
   if (first && caller?.end != null && first.start - Math.max(docEnd, caller.end) >= 300) {
     const ready = Math.max(docEnd, caller.end);
+    // The script that finished loading last before the call, well after the caller did: the gap up
+    // to the call is the time to parse and run it, which a slow CPU makes long.
     const blocker = v.requests
-      .filter((q) => q !== caller && q.type === 'Script' && q.end != null && q.end <= first.start + 5 && first.start - q.end <= 150 && q.end > caller.end + 200)
+      .filter((q) => q !== caller && q.type === 'Script' && q.end != null && q.end <= first.start + 5 && first.start - q.end <= 1000 && q.end > caller.end + 200)
       .sort((a, b) => b.end - a.end)[0];
     add({
       category: 'api-late', key: shortUrl(caller.url, origin), metric: metricFor(first), savings: { ms: Math.round(first.start - ready) }, confidence: 'estimated',
       title: `The first API call starts at ${fmtMs(first.start)}, ${fmtMs(first.start - ready)} after the code that makes it arrived`,
       culprit: { url: caller.url, ...(blocker ? { waitedFor: blocker.url } : {}) },
-      evidence: `${shortUrl(caller.url, origin)} arrived at ${fmtMs(caller.end)} but only called ${label(first)} at ${fmtMs(first.start)}${blocker ? `, right after ${shortUrl(blocker.url, origin)} finished loading (${fmtMs(blocker.end)}): deferred scripts run in document order, so it waited for that one` : ''}.`,
+      evidence: `${shortUrl(caller.url, origin)} arrived at ${fmtMs(caller.end)} but only called ${label(first)} at ${fmtMs(first.start)}${blocker ? `, after ${shortUrl(blocker.url, origin)} finished loading (${fmtMs(blocker.end)}) and ran: deferred scripts run in document order, so it waited for that one` : ''}.`,
       fix: `Start the data earlier: ${blocker ? `load ${shortUrl(blocker.url, origin)} after the code that fetches (or make it smaller, or \`async\`), ` : ''}preload the call in the HTML (\`<link rel="preload" as="fetch" href="${shortUrl(first.url, origin)}" crossorigin>\`), or fetch on the server and send the data with the page.`,
       fixRisk: 'medium', riskReason: 'changes when scripts run or where data is fetched',
     });

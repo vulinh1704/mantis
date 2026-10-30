@@ -326,7 +326,7 @@ describe('findings', () => {
     const [late] = findRouteIssues(route({}, { requests }), desktop).filter((f) => f.category === 'api-late');
     assert.equal(late.savings.ms, 2120);
     assert.equal(late.culprit.waitedFor, `${page}vendor.js`);
-    assert.match(late.evidence, /right after \/vendor\.js finished loading/);
+    assert.match(late.evidence, /after \/vendor\.js finished loading \(2\.4 s\) and ran/);
     assert.match(late.fix, /rel="preload" as="fetch" href="\/api\/me"/);
   });
 
@@ -471,7 +471,8 @@ describe('mantis perf on slow-app (end-to-end)', { concurrency: false }, () => {
     const m = route(mobile, '/');
     const d = route(desktop, '/');
     assert.equal(mobile.profile.name, 'mobile');
-    assert.ok(m.metrics.lcp.median > d.metrics.lcp.median * 2, `mobile LCP ${m.metrics.lcp.median} vs desktop ${d.metrics.lcp.median}`);
+    assert.ok(m.metrics.fcp.median > d.metrics.fcp.median * 2, `mobile FCP ${m.metrics.fcp.median} vs desktop ${d.metrics.fcp.median}`);
+    assert.ok(m.metrics.lcp.median > d.metrics.lcp.median + 1000, `mobile LCP ${m.metrics.lcp.median} vs desktop ${d.metrics.lcp.median}`);
     assert.ok(m.metrics.tbt.median > d.metrics.tbt.median, `mobile TBT ${m.metrics.tbt.median} vs desktop ${d.metrics.tbt.median}`);
     const e = m.visit.lcpElement;
     assert.ok(e.natural.width >= 2 * e.rect.width, JSON.stringify(e));
