@@ -2,6 +2,16 @@
 
 Full notes, with images, are on the [releases page](https://github.com/vulinh1704/mantis/releases).
 
+## Unreleased
+
+Fixes from a review of 0.5.0 (#30):
+- Markers on right-to-left pages are drawn where the culprit is, also left of x = 0.
+- A pseudo-locale cell over a non-Latin page is checked instead of being marked "not localized"; non-Latin text grows too; real locales are compared with the first real locale, not a pseudo one.
+- The pseudo-locale leaves inline SVG `<style>` and icon-font ligatures (Material Icons/Symbols) alone, and honours `translate="yes"` inside `translate="no"`.
+- Hydration mismatches that the pseudo-locale causes in server-rendered apps are a note, not a console error.
+- `direction` reads the direction where the right-to-left text is, so `dir="rtl"` on the app's root element is fine.
+- `learn` rejects `--locale-strategy`.
+
 ## 0.5.0 (2026-10-30)
 
 - `--locale-strategy path:/{locale} | query:<param> | cookie:<name> | storage:<key>` reaches the other languages of apps that don't follow the browser language: next-intl, i18next, Vue i18n, Rails. A run is compared only with earlier runs that used the same strategy.
