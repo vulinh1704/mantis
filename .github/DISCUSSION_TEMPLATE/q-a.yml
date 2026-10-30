@@ -1,0 +1,25 @@
+body:
+  - type: dropdown
+    id: how
+    attributes:
+      label: How you run Mantis
+      options:
+        - Claude Code plugin
+        - Skills in another agent (npx skills add)
+        - CLI (npm or npx)
+        - Docker
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Mantis version
+      description: "`mantis --version`"
+      placeholder: "0.4.0"
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+      description: What you are trying to do, the command you ran, and what happened. Paste output as text.
+    validations:
+      required: true

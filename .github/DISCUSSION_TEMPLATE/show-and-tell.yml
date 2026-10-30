@@ -1,0 +1,31 @@
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Show what Mantis found on your app: the bugs it caught, and the ones it missed or got wrong.
+        Both kinds help. Please leave out anything private (internal URLs, customer data) from screenshots.
+  - type: input
+    id: app
+    attributes:
+      label: The app
+      description: What it is and what it's built with. A link if it's public.
+      placeholder: "A Next.js dashboard with next-themes and next-intl (en, de, vi)"
+    validations:
+      required: true
+  - type: input
+    id: command
+    attributes:
+      label: Command
+      placeholder: "mantis look http://localhost:3000 --routes /,/settings --locales en,de,vi"
+  - type: textarea
+    id: caught
+    attributes:
+      label: What it caught
+      description: Paste or drag in the contact sheet or a screenshot, and say which findings were real.
+    validations:
+      required: true
+  - type: textarea
+    id: missed
+    attributes:
+      label: What it missed or got wrong
+      description: Bugs you saw that it didn't report, and findings that weren't real.
