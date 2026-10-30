@@ -100,7 +100,7 @@ Mantis: 0 errors, 0 warnings in 24 cells
 
 ## Cài đặt
 
-> Mantis đang ở giai đoạn đầu (v0.4). Có chỗ chưa mượt, gặp lỗi thì [mở issue](https://github.com/vulinh1704/mantis/issues) giúp mình.
+> Mantis đang ở giai đoạn đầu (v0.5). Có chỗ chưa mượt, gặp lỗi thì [mở issue](https://github.com/vulinh1704/mantis/issues) giúp mình.
 
 **Claude Code**
 

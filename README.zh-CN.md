@@ -100,7 +100,7 @@ Mantis: 0 errors, 0 warnings in 24 cells
 
 ## 安装
 
-> Mantis 还处于早期开发阶段（v0.4）。难免有不完善的地方，遇到问题请[提交 issue](https://github.com/vulinh1704/mantis/issues)。
+> Mantis 还处于早期开发阶段（v0.5）。难免有不完善的地方，遇到问题请[提交 issue](https://github.com/vulinh1704/mantis/issues)。
 
 **Claude Code**
 

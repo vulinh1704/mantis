@@ -1,6 +1,6 @@
 {
   "name": "mantis",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Catches the UI bugs your coding agent can't see, and the ones it hides: checks every screen, theme and language in a real browser, flags fixes that only hide a bug, keeps your house style, and proves the fix with before/after images.",
   "author": {
     "name": "Truong Dang Vu Linh",

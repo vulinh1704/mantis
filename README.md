@@ -240,7 +240,7 @@ The file holds a live session, so keep it out of git. Inside `.mantis/` it alrea
 
 ## Install
 
-> Mantis is in early development (v0.4). Expect rough edges, and please [open an issue](https://github.com/vulinh1704/mantis/issues) when it gets something wrong.
+> Mantis is in early development (v0.5). Expect rough edges, and please [open an issue](https://github.com/vulinh1704/mantis/issues) when it gets something wrong.
 
 **Claude Code**
 
