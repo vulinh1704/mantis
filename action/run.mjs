@@ -57,6 +57,13 @@ async function readJson(file) {
 }
 
 const esc = (s) => String(s ?? '').replace(/\|/g, '\\|').replace(/\n/g, ' ');
+/** Cut at a word boundary, with an ellipsis, and never inside an open `code` span. */
+export function short(s, max) {
+  if (s.length <= max) return s;
+  let cut = s.slice(0, max).replace(/\s+\S*$/, '');
+  if ((cut.match(/`/g) ?? []).length % 2) cut = cut.slice(0, cut.lastIndexOf('`')).trimEnd();
+  return `${cut} …`;
+}
 const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
 
 /** Markdown for a look report: the counts, the comparison, and the issues as a table. */
@@ -64,7 +71,7 @@ export function lookSummary(report, { url, baselineUrl }) {
   const s = report.summary;
   const b = report.baseline;
   const icon = s.errors ? '🔴' : s.warnings ? '🟡' : '🟢';
-  const lines = [`### ${icon} Mantis look: ${plural(s.errors, 'error')}, ${plural(s.warnings, 'warning')} in ${s.cells} cells`, ''];
+  const lines = [`### ${icon} Mantis look: ${plural(s.errors, 'error')}, ${plural(s.warnings, 'warning')} in ${plural(s.cells, 'cell')}`, ''];
   lines.push(`\`${url}\`${baselineUrl ? ` compared with \`${baselineUrl}\`` : ''}`, '');
   if (b) {
     lines.push(`**${b.fixed.length} fixed · ${b.new.length} new · ${plural(b.coverUps, 'cover-up')} · ${b.lost} lost**${b.coverUps ? ': an issue went away because its element was hidden, removed or shrunk, not fixed.' : ''}`, '');
@@ -74,7 +81,7 @@ export function lookSummary(report, { url, baselineUrl }) {
     lines.push('| | type | where | screens | |', '|---|---|---|---|---|');
     for (const i of issues.slice(0, 20)) {
       const cells = i.cells.length > 3 ? `${i.cells.slice(0, 3).join(', ')} +${i.cells.length - 3}` : i.cells.join(', ');
-      lines.push(`| ${i.severity === 'error' ? '🔴' : '🟡'} | ${esc(i.type)} | \`${esc(i.selector ?? i.route)}\` | ${esc(cells)} | ${esc(i.message).slice(0, 140)} |`);
+      lines.push(`| ${i.severity === 'error' ? '🔴' : '🟡'} | ${esc(i.type)} | \`${esc(i.selector ?? i.route)}\` | ${esc(cells)} | ${short(esc(i.message), 160)} |`);
     }
     if (issues.length > 20) lines.push('', `… and ${issues.length - 20} more in report.md.`);
     lines.push('');
@@ -108,7 +115,7 @@ export function perfSummary(report, { url, baselineUrl }) {
   const top = report.findings.filter((f) => f.bucket === 'do-first' || f.bucket === 'plan').slice(0, 8);
   if (top.length) {
     lines.push('**Fix first**', '');
-    for (const f of top) lines.push(`- ${f.bucket === 'do-first' ? '✅ do first' : '🛠 plan'} · ${esc(f.title)} (${f.metric === 'bytes' ? `−${f.savings.kb} KB` : f.metric === 'cls' ? `CLS −${f.savings.cls}` : `${f.metric.toUpperCase()} −${fmtMs(f.savings.ms)}`}, risk ${f.fixRisk})`);
+    for (const f of top) lines.push(`- ${f.bucket === 'do-first' ? '✅ do first' : '🛠 plan'} · ${esc(f.title)} (${f.metric === 'bytes' ? `−${f.savings.kb} KB` : f.metric === 'cls' ? `CLS −${f.savings.cls}` : `${f.metric === 'data' ? 'data' : f.metric.toUpperCase()} −${fmtMs(f.savings.ms)}`}, risk ${f.fixRisk})`);
     lines.push('');
   }
   return lines.join('\n');
