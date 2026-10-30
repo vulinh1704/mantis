@@ -1,5 +1,5 @@
 {
-  "$comment": "Every performance problem planted in slow-app (served by test/helpers/slow-server.js, which adds the API delays, the hero image, the bundle and the vendor origin), with what mantis perf must measure to explain it. test/perf.test.js checks the evidence, and `finding` is what mantis perf --profile mobile must report: the category, the bucket where it is stable, and regexes on the culprit and the fix. Problems without one are covered by the API and third-party findings.",
+  "$comment": "Every performance problem planted in slow-app (served by test/helpers/slow-server.js, which adds the API delays, the hero image, the bundle and the vendor origin), with what mantis perf must measure to explain it. test/perf.test.js checks the evidence, and `finding` is what mantis perf --profile mobile must report: the category, the bucket where it is stable, and regexes on the culprit and the fix.",
   "routes": {
     "/": "the orders page, with every problem below",
     "/fast": "the same app's help page: one request, nothing to fix",
@@ -51,28 +51,40 @@
       "title": "/api/orders waits for /api/user although the server knows the user",
       "where": "app.js loadOrders()",
       "fix": "start both at once (the server reads the session), or one endpoint",
-      "evidence": "orders.start >= user.end, initiator loadOrders"
+      "evidence": "orders.start >= user.end, initiator loadOrders",
+      "finding": { "category": "api-chain", "bucket": "plan", "culprit": { "fn": "^loadOrders$", "url": "/api/orders" } }
     },
     {
       "id": "slow-api",
       "title": "/api/orders takes 500 ms on the server",
       "where": "GET /api/orders",
       "fix": "server-side: query, index or cache",
-      "evidence": "serverWait >= 450 ms from the unthrottled visit"
+      "evidence": "serverWait >= 450 ms from the unthrottled visit",
+      "finding": { "category": "api-slow", "culprit": { "url": "/api/orders\\?user=7$", "fn": "^loadOrders$" } }
     },
     {
       "id": "n-plus-one",
       "title": "One /api/products request per order",
       "where": "app.js loadProducts()",
       "fix": "one batched request, or embed the products in /api/orders",
-      "evidence": "five /api/products/<id> requests from the same line"
+      "evidence": "five /api/products/<id> requests from the same line",
+      "finding": { "category": "api-n-plus-1", "culprit": { "url": "/api/products/\\d+$" }, "fix": "/api/products\\?ids=" }
     },
     {
       "id": "duplicate-request",
       "title": "/api/config is fetched twice",
       "where": "app.js main()",
       "fix": "fetch once and share the promise",
-      "evidence": "two GET /api/config"
+      "evidence": "two GET /api/config",
+      "finding": { "category": "api-duplicate", "bucket": "do-first", "culprit": { "url": "/api/config$", "fn": "^loadConfig$" } }
+    },
+    {
+      "id": "late-data",
+      "title": "The data starts loading late: app.js is deferred behind big.js, and deferred scripts run in order",
+      "where": "index.html <script defer src=\"/big.js\"> before /app.js",
+      "fix": "load the code that fetches first, preload the first call, or fetch on the server",
+      "evidence": "the first /api call starts right after big.js finishes, long after app.js arrived",
+      "finding": { "category": "api-late", "bucket": "plan", "culprit": { "url": "/app\\.js$", "waitedFor": "/big\\.js$" } }
     },
     {
       "id": "main-thread-hog",
@@ -95,7 +107,16 @@
       "title": "A chat widget from another origin blocks the main thread on start and sends a beacon",
       "where": "{{VENDOR}}/widget.js",
       "fix": "load it on interaction or after the page is idle (facade)",
-      "evidence": "hotFunctions has bootChatWidget on the vendor origin"
+      "evidence": "hotFunctions has bootChatWidget on the vendor origin",
+      "finding": { "category": "third-party", "bucket": "plan", "culprit": { "url": "/widget\\.js$", "from": ":9$" } }
+    },
+    {
+      "id": "third-party-cost",
+      "title": "Whether the widget is worth its main-thread time is a product decision",
+      "where": "{{VENDOR}}/widget.js",
+      "fix": "keep, load only where needed, replace or drop it: someone has to decide",
+      "evidence": "more than 250 ms of main thread on the mobile profile",
+      "finding": { "category": "third-party-cost", "bucket": "your-call", "culprit": { "url": "/widget\\.js$" } }
     }
   ]
 }

@@ -17,6 +17,23 @@ Full notes, with images, are on the [releases page](https://github.com/vulinh170
   - uncompressed text away from localhost.
 
   A layout shift saves only what CLS would drop without it, and an image fix saves at most LCP − FCP. Exit code 1 when there is something to do first or to plan.
+- `mantis perf` investigates the app's API calls and its third parties:
+  - **API calls** are traced to the code that made them, with its callers (`loadConfig` /app.js:4 ← `main` /app.js:51). It finds:
+    - slow endpoints, from the server's real wait;
+    - calls that wait for each other;
+    - the same call made twice;
+    - one call per item (N+1);
+    - large or uncompressed JSON;
+    - a first call that starts late, naming the script it waited for.
+
+    "API data in" (when the last call was answered) is a new metric.
+  - **Third parties** are grouped by vendor (Google Analytics, Intercom, YouTube, Stripe and about 50 more, or by site), with:
+    - their requests and bytes;
+    - main-thread time;
+    - render-blocking files and iframes;
+    - the fix that suits the kind of vendor (a facade for chat and video, a static map, loading analytics after the page is interactive, self-hosting fonts).
+
+    A costly vendor also gets a "your call" entry: whether it is worth it is a product decision.
 
 ## 0.5.1 (2026-10-30)
 
