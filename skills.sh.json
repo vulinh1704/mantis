@@ -1,0 +1,16 @@
+{
+  "$schema": "https://skills.sh/schemas/skills.sh.schema.json",
+  "paths": ["./plugins/mantis/skills"],
+  "groupings": [
+    {
+      "title": "Look",
+      "description": "Check the running app on every screen, theme and language before calling a UI task done.",
+      "skills": ["mantis"]
+    },
+    {
+      "title": "Fix and prove",
+      "description": "Fix at the root, catch fixes that only hide a bug, and show before/after proof.",
+      "skills": ["mantis-fix", "mantis-proof"]
+    }
+  ]
+}
