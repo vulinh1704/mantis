@@ -1,0 +1,41 @@
+name: Missed bug
+description: A screen is visibly broken and Mantis said nothing.
+labels: ["missed bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Check the Limits section of the README first: some bugs (hover states,
+        text over photos, animation smoothness) are out of scope on purpose.
+  - type: input
+    id: version
+    attributes:
+      label: Mantis version
+      placeholder: "0.4.0"
+    validations:
+      required: true
+  - type: input
+    id: command
+    attributes:
+      label: Command
+      placeholder: "mantis look http://localhost:3000 --routes / --dark-strategy class:dark"
+    validations:
+      required: true
+  - type: textarea
+    id: bug
+    attributes:
+      label: What is broken
+      description: The element, and the screen size, theme and language where it breaks. A screenshot helps.
+    validations:
+      required: true
+  - type: textarea
+    id: report
+    attributes:
+      label: What Mantis reported instead
+      description: The summary from `.mantis/latest/report.md`, or "nothing".
+      render: markdown
+  - type: textarea
+    id: repro
+    attributes:
+      label: How to reproduce
+      description: A public URL, or a minimal HTML page that shows the bug.
