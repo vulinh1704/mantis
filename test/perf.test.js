@@ -438,7 +438,7 @@ describe('mantis perf on slow-app (end-to-end)', { concurrency: false }, () => {
   const req = (visit, re) => visit.requests.find((q) => re.test(q.url));
 
   before(async () => {
-    tmp = await mkdtemp(path.join(os.tmpdir(), 'mantis-perf-'));
+    tmp = await mkdtemp(path.join(os.tmpdir(), 'mantis-test-perf-'));
     server = await startSlowServer();
     // 3 visits: under load Chrome now and then reports no LCP entry for an image it has painted
     // (seen 1 time in 20), and the median of 3 is the honest visit, where 2 could pick the odd one.
@@ -456,7 +456,8 @@ describe('mantis perf on slow-app (end-to-end)', { concurrency: false }, () => {
 
   after(async () => {
     await server?.close();
-    await rm(tmp, { recursive: true, force: true });
+    if (process.env.MANTIS_KEEP_TEST_OUTPUT) process.stdout.write(`# test output kept in ${tmp}\n`);
+    else await rm(tmp, { recursive: true, force: true });
   });
 
   test('every metric is the median of the runs, with its spread', () => {

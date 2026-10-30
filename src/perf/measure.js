@@ -353,6 +353,8 @@ function collectInPage() {
     fcp: P.fcp != null ? Math.round(P.fcp) : null,
     lcp: lastLcp ? Math.round(lastLcp.t) : null,
     lcpElement,
+    // every candidate Chrome reported, in order: the LCP is the largest
+    lcpCandidates: P.lcp.slice(-10).map((e) => ({ t: Math.round(e.t), size: e.size, url: e.url, tag: e.element?.localName ?? null })),
     shifts: P.shifts.map((s) => ({ t: Math.round(s.t), value: s.value, sources: s.nodes.map(sel).filter(Boolean).slice(0, 4), cause: causeOf(s) })),
     fonts: document.fonts ? [...document.fonts].map((f) => ({ family: f.family.replace(/^["']|["']$/g, ''), display: f.display, status: f.status })) : [],
     fontRules: fontFaceRules(),
