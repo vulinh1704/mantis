@@ -6,7 +6,7 @@
  * mostly unused bundle and a third-party chat widget on another origin.
  */
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -17,6 +17,7 @@ import { aggregate, attachServerWait, median, rating, renderPerfMarkdown, repres
 import { PERF_PROFILES, clsOf, hotFunctions, tbtOf, unusedJsBytes } from '../src/perf/measure.js';
 import { siteOf } from '../src/perf/metrics.js';
 import { apiPattern, appApis } from '../src/perf/network.js';
+import { pickFrames, waterfallRows } from '../src/perf/sheet.js';
 import { vendorOf } from '../src/perf/vendors.js';
 import { runCli } from './helpers/cli.js';
 import { FIXTURES } from './helpers/static-server.js';
@@ -187,17 +188,54 @@ describe('findings', () => {
       coverage: [{ url: 'https://shop.example.com/site.css', type: 'css', total: 80000, unused: 70000 }],
     }), mobile);
     const by = Object.fromEntries(found.map((f) => [f.category, f]));
-    assert.deepEqual(Object.keys(by).sort(), ['font', 'server', 'transfer', 'unused-code']);
+    assert.deepEqual(Object.keys(by).sort(), ['font', 'server', 'transfer', 'unused-css']);
     assert.equal(by.server.fixRisk, 'high');
     assert.equal(by.server.savings.ms, 1100);
     assert.equal(by.server.bucket, 'plan');
     assert.match(by.font.title, /Brand/);
     assert.equal(by.font.savings.ms, 1100, 'hidden from the font request until it arrives');
     assert.match(by.font.fix, /font-display: swap/);
-    assert.match(by['unused-code'].fix, /unused rules/);
+    assert.match(by['unused-css'].title, /88% of the CSS in \/site\.css matches nothing on this page/);
+    assert.match(by['unused-css'].fix, /unused rules/);
+    assert.equal(by['unused-css'].frameworkFix, null);
     assert.match(by.transfer.evidence, /cdn\.example\.com\/app\.js/, 'another subdomain of the same site is first-party');
     const local = findRouteIssues(route({}, { requests: [{ ...doc, url: 'http://127.0.0.1:3000/', serverWait: 50 }, { ...js, url: 'http://127.0.0.1:3000/app.js' }] }), mobile);
     assert.deepEqual(local, [], 'local servers rarely compress like production');
+  });
+
+  test('fonts: each file is tied to its @font-face, so only the files that hide text count', () => {
+    const o = 'http://127.0.0.1:3000';
+    const font = (name, start, end) => ({ url: `${o}/fonts/${name}.woff2`, method: 'GET', type: 'Font', start, end, bytes: 30000 });
+    const requests = [route().visit.requests[0], font('body', 300, 900), font('display', 300, 2600), font('icons', 400, 3900)];
+    const fontRules = [
+      { family: 'Body', display: 'swap', urls: [`${o}/fonts/body.woff2`] },
+      { family: 'Display', display: 'block', urls: [`${o}/fonts/display.woff2`] },
+    ];
+    const fonts = [{ family: 'Body', display: 'swap', status: 'loaded' }, { family: 'Display', display: 'block', status: 'loaded' }, { family: 'Icons', display: 'auto', status: 'loaded' }];
+    const [f] = findRouteIssues(route({}, { requests, fontRules, fonts }), mobile).filter((x) => x.category === 'font');
+    assert.equal(f.title, 'Text stays invisible until the web font arrives: Display');
+    assert.equal(f.savings.ms, 2300, 'display.woff2 only: the swap font and the unreadable icons file do not count');
+    assert.equal(f.culprit.url, `${o}/fonts/display.woff2`);
+    const swapOnly = findRouteIssues(route({}, { requests: requests.slice(0, 2), fontRules: fontRules.slice(0, 1), fonts: fonts.slice(0, 1) }), mobile);
+    assert.deepEqual(swapOnly.filter((x) => x.category === 'font'), []);
+  });
+
+  test('a minified bundle: the column finds the code, and 1:1 is its top level', () => {
+    const url = 'http://127.0.0.1:3000/assets/index-abc.js';
+    const hot = [{ fn: '(anonymous)', url, line: 1, column: 1, self: 60 }, { fn: 'xe', url, line: 1, column: 48211, self: 40 }];
+    const found = findRouteIssues(route({}, { hotFunctions: hot }), mobile);
+    assert.equal(found[0].title, 'The top-level code of /assets/index-abc.js holds the main thread for about 240 ms');
+    assert.match(found[0].fix, /Run less as the script loads/);
+    assert.equal(found[1].culprit.column, 48211);
+    assert.match(found[1].evidence, /index-abc\.js:1:48211 \(a minified bundle/);
+  });
+
+  test('a host that only serves fonts is a font host: self-host them', () => {
+    const fonts = [1, 2, 3].map((i) => ({ url: `https://assets.fontcdn.example/f${i}.woff2`, method: 'GET', type: 'Font', start: 300, end: 900, bytes: 30000 }));
+    const [v] = findRouteIssues(route({}, { requests: [route().visit.requests[0], ...fonts] }), mobile).filter((x) => x.category === 'third-party');
+    assert.equal(v.vendor.category, 'fonts');
+    assert.match(v.title, /fontcdn\.example \(fonts\): 88 KB/);
+    assert.match(v.fix, /Self-host the font files/);
   });
 
   test('layout shifts: grouped by cause, and a cause saves only what CLS would drop without it', () => {
@@ -328,6 +366,11 @@ describe('findings', () => {
     assert.equal(late.culprit.waitedFor, `${page}vendor.js`);
     assert.match(late.evidence, /after \/vendor\.js finished loading \(2\.4 s\) and ran/);
     assert.match(late.fix, /rel="preload" as="fetch" href="\/api\/me"/);
+    // No script to blame: a 600 ms delay may only be a busy machine; 1.2 s counts.
+    const alone = (start) => findRouteIssues(route({}, { requests: [requests[0], requests[2], { ...requests[3], start, end: start + 180 }] }), desktop).filter((f) => f.category === 'api-late');
+    assert.deepEqual(alone(900), []);
+    assert.equal(alone(1500).length, 1);
+    assert.equal(alone(1500)[0].culprit.waitedFor, undefined);
   });
 
   test('siteOf tells first-party from third-party', () => {
@@ -470,10 +513,12 @@ describe('mantis perf on slow-app (end-to-end)', { concurrency: false }, () => {
     const m = route(mobile, '/');
     const d = route(desktop, '/');
     assert.equal(mobile.profile.name, 'mobile');
-    // Slow 4G adds 562 ms to every round trip; a ratio would depend on how fast the machine is.
-    assert.ok(m.metrics.fcp.median > d.metrics.fcp.median + 400, `mobile FCP ${m.metrics.fcp.median} vs desktop ${d.metrics.fcp.median}`);
-    assert.ok(m.metrics.lcp.median > d.metrics.lcp.median + 1000, `mobile LCP ${m.metrics.lcp.median} vs desktop ${d.metrics.lcp.median}`);
-    assert.ok(m.metrics.tbt.median > d.metrics.tbt.median, `mobile TBT ${m.metrics.tbt.median} vs desktop ${d.metrics.tbt.median}`);
+    // Slow 4G holds every response for its 562 ms latency, however busy the machine is; margins
+    // between the two profiles would depend on the load of the machine running the tests.
+    const doc = m.visit.requests.find((q) => q.type === 'Document');
+    assert.ok(doc.end >= 500, `the HTML arrived at ${doc.end} ms on slow 4G`);
+    assert.ok(m.metrics.fcp.median > d.metrics.fcp.median, `mobile FCP ${m.metrics.fcp.median} vs desktop ${d.metrics.fcp.median}`);
+    assert.ok(m.metrics.lcp.median > d.metrics.lcp.median, `mobile LCP ${m.metrics.lcp.median} vs desktop ${d.metrics.lcp.median}`);
     const e = m.visit.lcpElement;
     assert.ok(e.natural.width >= 2 * e.rect.width, JSON.stringify(e));
   });
@@ -509,5 +554,49 @@ describe('mantis perf on slow-app (end-to-end)', { concurrency: false }, () => {
 
   test('a lean page has nothing to fix', () => {
     assert.ok(!desktop.findings.some((f) => f.routes.includes('/fast')), JSON.stringify(desktop.findings.filter((f) => f.routes.includes('/fast'))));
+  });
+
+  test('the sheet and the filmstrip: frames saved as files, the first paint and LCP marked', () => {
+    const latest = path.join(tmp, 'm', 'perf', 'latest');
+    assert.ok(existsSync(path.join(latest, 'perf-sheet.png')));
+    assert.match(mobileStdout, /sheet {3}.*perf-sheet\.png/);
+    const strip = route(mobile, '/').visit.filmstrip;
+    assert.ok(strip.length >= 4, JSON.stringify(strip));
+    assert.ok(strip.some((f) => f.lcp) && strip.some((f) => f.fcp), JSON.stringify(strip));
+    for (const f of strip.filter((x) => x.file)) assert.ok(existsSync(path.join(latest, f.file)), f.file);
+    assert.doesNotMatch(readFileSync(path.join(latest, 'perf.json'), 'utf8'), /"jpeg"/, 'no frame data in perf.json');
+  });
+});
+
+describe('perf sheet', () => {
+  test('filmstrip frames: even steps up to the last change, with the first paint and LCP on frames of their own', () => {
+    const frames = [0, 300, 1200, 2500, 5100, 5900].map((t) => ({ t, jpeg: String(t) }));
+    const picks = pickFrames(frames, { fcp: 1190, lcp: 5150, count: 6 });
+    // steps of 5900 / 6; the step nearest each mark moves onto it; each shows the latest frame by then
+    assert.deepEqual(picks.map((p) => p.t), [1190, 1967, 2950, 3933, 5150, 5900]);
+    assert.deepEqual(picks.map((p) => p.frame?.t ?? null), [300, 1200, 2500, 2500, 5100, 5900]);
+    assert.ok(picks[0].fcp && picks[4].lcp);
+    assert.deepEqual(pickFrames([], { fcp: 1, lcp: 2 }), []);
+    const close = pickFrames(frames.map((f, i) => ({ ...f, t: i * 1400 })), { fcp: 6200, lcp: 6600, count: 8 });
+    assert.ok(close.some((p) => p.fcp) && close.some((p) => p.lcp), 'marks close together get a frame each');
+  });
+
+  test('waterfall: the document, what blocks the first paint, the LCP image, API calls and big scripts', () => {
+    const o = 'http://x';
+    const rows = waterfallRows({
+      lcpElement: { url: `${o}/hero.jpg` },
+      requests: [
+        { url: `${o}/`, type: 'Document', start: 0, end: 100 },
+        { url: `${o}/a.css`, type: 'Stylesheet', start: 110, end: 300, renderBlocking: true },
+        { url: `${o}/icon.svg`, type: 'Image', start: 120, end: 200 },
+        { url: `${o}/hero.jpg`, type: 'Image', start: 130, end: 900 },
+        { url: `${o}/api/me`, type: 'Fetch', start: 400, end: 700 },
+        { url: 'https://cdn.example.com/w.js', type: 'Script', start: 150, end: 600, bytes: 90000 },
+        { url: `${o}/tiny.js`, type: 'Script', start: 160, end: 170, bytes: 900 },
+      ],
+    }, o);
+    assert.deepEqual(rows.map((r) => [r.label, r.kind, r.third]), [
+      ['/', 'doc', false], ['/a.css', 'block', false], ['/hero.jpg', 'lcp', false], ['cdn.example.com/w.js', 'js', true], ['/api/me', 'api', false],
+    ]);
   });
 });

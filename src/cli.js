@@ -214,6 +214,7 @@ export async function main(argv = process.argv.slice(2), { stdout = process.stdo
           for (const c of b.coverUps) out(`  COVER-UP ${c.route}: faster, or just emptier? ${c.improved.join(', ')}, but ${c.reasons[0]}`);
         }
         out(`  report  ${rel(path.join(res.latestDir, 'perf.md'))}`);
+        if (res.sheet) out(`  sheet   ${rel(res.sheet)}`);
         out(`  run     ${rel(res.runDir)}`);
       }
       return res.exitCode;
