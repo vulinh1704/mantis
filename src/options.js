@@ -513,6 +513,7 @@ export function parseProofArgs(argv) {
  * @property {string} out
  * @property {boolean} json
  * @property {number} timeout
+ * @property {string} baseline  'auto', 'none' or a perf run directory
  * @property {string|null} storageState
  */
 
@@ -535,6 +536,7 @@ export function parsePerfArgs(argv) {
         out: { type: 'string' },
         json: { type: 'boolean' },
         timeout: { type: 'string' },
+        baseline: { type: 'string' },
         'storage-state': { type: 'string' },
       },
     });
@@ -554,6 +556,7 @@ export function parsePerfArgs(argv) {
     out: values.out ?? LOOK_DEFAULTS.out,
     json: Boolean(values.json),
     timeout: parseIntOpt('timeout', values.timeout, 1000, 600000) ?? 60000,
+    baseline: parseBaseline(values.baseline),
     storageState: parseStorageStatePath(values['storage-state']),
   };
 }
