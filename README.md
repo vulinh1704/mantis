@@ -238,7 +238,8 @@ npx skills add vulinh1704/mantis
 **Just the CLI**
 
 ```bash
-npx -y github:vulinh1704/mantis look http://localhost:3000
+npx -y @vulinh1704/mantis look http://localhost:3000
+# or install it: npm i -g @vulinh1704/mantis
 ```
 
 Mantis drives Chromium through Playwright. If the browser isn't installed yet, run `npx playwright install chromium`. Node.js 20 or newer.
