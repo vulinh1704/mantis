@@ -3,8 +3,11 @@
  * - the API answers after a delay: /api/config 200 ms, /api/user 300 ms, /api/orders 500 ms,
  *   /api/products/<id> 250 ms;
  * - /flags.js (synchronous in <head>) arrives after 300 ms;
- * - /hero.png is a 1200×750 photo-like PNG made at start, /big.js a bundle that is mostly unused,
- *   /@vite/client an empty module (dev.html pretends to be a Vite dev server);
+ * - /hero.png is a 1200×750 photo-like PNG made at start. It answers after 2 s, so its size is known
+ *   only after the first paint on any machine (on a slow CPU the first paint can come late enough to
+ *   hide the layout shift its missing width and height cause);
+ * - /big.js is a bundle that is mostly unused, /@vite/client an empty module (dev.html pretends to
+ *   be a Vite dev server);
  * - a second server on another port plays a third-party vendor: /widget.js (after 200 ms, then
  *   blocks the main thread) and a /collect beacon (after 400 ms). {{VENDOR}} in HTML is its origin;
  * - nothing is cached.
@@ -125,7 +128,10 @@ export async function startSlowServer({ port = 0, host = '127.0.0.1' } = {}) {
       await sleep(250);
       return send(res, 200, 'application/json', JSON.stringify({ id: Number(product[1]), name: `Product ${product[1]}` }));
     }
-    if (pathname === '/hero.png') return send(res, 200, 'image/png', hero);
+    if (pathname === '/hero.png') {
+      await sleep(2000);
+      return send(res, 200, 'image/png', hero);
+    }
     if (pathname === '/big.js') return send(res, 200, TYPES['.js'], big);
     if (pathname === '/@vite/client') return send(res, 200, TYPES['.js'], '// stands in for the Vite client\n');
     if (pathname === '/flags.js') await sleep(300);

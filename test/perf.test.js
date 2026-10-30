@@ -210,6 +210,9 @@ describe('findings', () => {
     const promo = found.find((f) => f.culprit.selector === 'div.promo');
     assert.equal(hero.savings.cls, 0.08);
     assert.equal(hero.confidence, 'estimated', 'the image was found by position, not by time');
+    const fitted = findRouteIssues(route({}, { shifts: [{ ...shifts[0], cause: { ...shifts[0].cause, moved: 258, fits: true } }] }), mobile)[0];
+    assert.equal(fitted.confidence, 'measured', 'the content moved exactly the image\'s height');
+    assert.match(fitted.evidence, /258 px down, as tall as `img\.hero`/);
     assert.equal(hero.bucket, 'do-first');
     assert.equal(promo.savings.cls, 0);
     assert.equal(promo.bucket, 'nice');
