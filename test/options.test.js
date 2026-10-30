@@ -8,6 +8,7 @@ import {
   UsageError,
   normalizeRoutes,
   parseDarkStrategy,
+  parseLocaleStrategy,
   parseLookArgs,
   parseProofArgs,
   parseViewport,
@@ -17,6 +18,7 @@ import {
   undoMsysPath,
   storageStateName,
 } from '../src/options.js';
+import { localeUrl } from '../src/page.js';
 
 describe('parseLookArgs', () => {
   test('defaults match the documented contract', () => {
@@ -100,6 +102,29 @@ describe('helpers', () => {
     assert.deepEqual(parseDarkStrategy('attr:data-theme=dark'), { kind: 'attr', name: 'data-theme', value: 'dark' });
     assert.deepEqual(parseDarkStrategy('attr:data-mode'), { kind: 'attr', name: 'data-mode', value: 'dark' });
     assert.throws(() => parseDarkStrategy('class:'), UsageError);
+  });
+
+  test('parseLocaleStrategy', () => {
+    assert.deepEqual(parseLocaleStrategy('browser'), { kind: 'browser' });
+    assert.deepEqual(parseLocaleStrategy(''), { kind: 'browser' });
+    assert.deepEqual(parseLocaleStrategy('path:/{locale}'), { kind: 'path', template: '/{locale}' });
+    assert.deepEqual(parseLocaleStrategy('path:/app/{locale}/'), { kind: 'path', template: '/app/{locale}/' });
+    assert.deepEqual(parseLocaleStrategy('query:lang'), { kind: 'query', name: 'lang' });
+    assert.deepEqual(parseLocaleStrategy('cookie:NEXT_LOCALE'), { kind: 'cookie', name: 'NEXT_LOCALE' });
+    assert.deepEqual(parseLocaleStrategy('storage:i18nextLng'), { kind: 'storage', key: 'i18nextLng' });
+    assert.throws(() => parseLocaleStrategy('path:/app'), UsageError, 'a path needs {locale}');
+    assert.throws(() => parseLocaleStrategy('header:x-lang'), UsageError);
+    assert.deepEqual(parseLookArgs(['http://localhost:3000']).localeStrategy, { kind: 'browser' });
+    assert.deepEqual(parseLookArgs(['http://localhost:3000', '--locale-strategy', 'query:hl']).localeStrategy, { kind: 'query', name: 'hl' });
+  });
+
+  test('localeUrl', () => {
+    const base = new URL('http://localhost:3000/');
+    assert.equal(localeUrl(base, '/', 'vi', { kind: 'browser' }), 'http://localhost:3000/');
+    assert.equal(localeUrl(base, '/', 'vi', { kind: 'path', template: '/{locale}' }), 'http://localhost:3000/vi/');
+    assert.equal(localeUrl(base, '/settings?tab=2', 'de-DE', { kind: 'path', template: '/{locale}/' }), 'http://localhost:3000/de-DE/settings?tab=2');
+    assert.equal(localeUrl(base, '/pricing?x=1', 'vi', { kind: 'query', name: 'lang' }), 'http://localhost:3000/pricing?x=1&lang=vi');
+    assert.equal(localeUrl(base, '/', 'vi', { kind: 'cookie', name: 'lang' }), 'http://localhost:3000/');
   });
 
   test('routeSlug', () => {

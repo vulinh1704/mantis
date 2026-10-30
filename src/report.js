@@ -231,6 +231,7 @@ export function buildReport({ version, runId, startedAt, finishedAt, options, ce
       schemes: options.schemes,
       locales: options.locales,
       darkStrategy: options.darkStrategyText,
+      localeStrategy: options.localeStrategyText ?? 'browser',
       ignore: options.ignore ?? [],
       storageState: storageStateName(options.storageState),
     },
@@ -276,7 +277,7 @@ export function renderMarkdown(report, { maxPerType = 30 } = {}) {
   const s = report.summary;
   lines.push('# Mantis report', '');
   const dims = `${m.routes.length} route${m.routes.length > 1 ? 's' : ''} × ${m.viewports.length} viewport${m.viewports.length > 1 ? 's' : ''} × ${m.schemes.length} scheme${m.schemes.length > 1 ? 's' : ''} × ${m.locales.length} locale${m.locales.length > 1 ? 's' : ''}`;
-  lines.push(`\`${report.url}\` · ${formatLocalTime(report.startedAt)} · ${s.cells} cells (${dims})${m.storageState ? ` · session \`${m.storageState}\`` : ''} · ${(report.durationMs / 1000).toFixed(1)}s`, '');
+  lines.push(`\`${report.url}\` · ${formatLocalTime(report.startedAt)} · ${s.cells} cells (${dims})${m.storageState ? ` · session \`${m.storageState}\`` : ''}${m.localeStrategy && m.localeStrategy !== 'browser' ? ` · locale via \`${m.localeStrategy}\`` : ''} · ${(report.durationMs / 1000).toFixed(1)}s`, '');
   lines.push(`**${s.errors} error${s.errors === 1 ? '' : 's'} · ${s.warnings} warning${s.warnings === 1 ? '' : 's'}** (exit ${s.exitCode})${s.failedCells ? ` · ${s.failedCells} cell(s) failed to load` : ''}`, '');
 
   // Summary table: rows = route · locale, columns = viewport × scheme.

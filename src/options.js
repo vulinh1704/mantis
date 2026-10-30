@@ -35,6 +35,7 @@ export const LOOK_DEFAULTS = Object.freeze({
   schemes: ['light', 'dark'],
   locales: ['en'],
   darkStrategy: 'media',
+  localeStrategy: 'browser',
   out: '.mantis',
   wait: 0,
   json: false,
@@ -90,6 +91,41 @@ export function formatDarkStrategy(d) {
   if (d.kind === 'class') return `class:${d.name}`;
   if (d.kind === 'attr') return `attr:${d.name}=${d.value}`;
   return 'media';
+}
+
+/**
+ * @typedef {{kind: 'browser'} | {kind: 'path', template: string} | {kind: 'query', name: string} |
+ *   {kind: 'cookie', name: string} | {kind: 'storage', key: string}} LocaleStrategy
+ */
+
+/**
+ * How the app picks its language, on top of the browser locale and Accept-Language that every cell
+ * already sets: `browser` (only those), `path:/{locale}` (a URL prefix), `query:<param>`,
+ * `cookie:<name>` or `storage:<localStorage key>`.
+ * @param {string} input
+ * @returns {LocaleStrategy}
+ */
+export function parseLocaleStrategy(input) {
+  const s = String(input ?? '').trim();
+  if (s === '' || s === 'browser') return { kind: 'browser' };
+  let m = s.match(/^path:(\/[\w\-./]*\{locale\}[\w\-./]*)$/);
+  if (m) return { kind: 'path', template: m[1] };
+  m = s.match(/^query:([\w.-]+)$/);
+  if (m) return { kind: 'query', name: m[1] };
+  m = s.match(/^cookie:([\w.-]+)$/);
+  if (m) return { kind: 'cookie', name: m[1] };
+  m = s.match(/^storage:([\w.:-]+)$/);
+  if (m) return { kind: 'storage', key: m[1] };
+  throw new UsageError(`invalid --locale-strategy "${s}" (use browser, path:/{locale}, query:<param>, cookie:<name> or storage:<key>)`);
+}
+
+/** @param {LocaleStrategy} l */
+export function formatLocaleStrategy(l) {
+  if (l.kind === 'path') return `path:${l.template}`;
+  if (l.kind === 'query') return `query:${l.name}`;
+  if (l.kind === 'cookie') return `cookie:${l.name}`;
+  if (l.kind === 'storage') return `storage:${l.key}`;
+  return 'browser';
 }
 
 /** Split a comma list, trim, drop empties and duplicates (order kept). */
@@ -180,6 +216,7 @@ const LOCALE_RE = /^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$/;
  * @property {('light'|'dark')[]} schemes
  * @property {string[]} locales
  * @property {DarkStrategy} darkStrategy
+ * @property {LocaleStrategy} localeStrategy
  * @property {string} out
  * @property {number} wait
  * @property {boolean} json
@@ -209,6 +246,7 @@ export function parseLookArgs(argv) {
         schemes: { type: 'string' },
         locales: { type: 'string' },
         'dark-strategy': { type: 'string' },
+        'locale-strategy': { type: 'string' },
         out: { type: 'string' },
         wait: { type: 'string' },
         json: { type: 'boolean' },
@@ -273,6 +311,7 @@ export function parseLookArgs(argv) {
     schemes: /** @type {('light'|'dark')[]} */ (schemes),
     locales,
     darkStrategy: parseDarkStrategy(values['dark-strategy'] ?? LOOK_DEFAULTS.darkStrategy),
+    localeStrategy: parseLocaleStrategy(values['locale-strategy'] ?? LOOK_DEFAULTS.localeStrategy),
     out: values.out ?? LOOK_DEFAULTS.out,
     wait: parseIntOpt('wait', values.wait, 0, 120000) ?? LOOK_DEFAULTS.wait,
     json: Boolean(values.json),

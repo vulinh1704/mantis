@@ -31,6 +31,9 @@ in <out>/latest.
                                identical to the first one is marked "not localized"
   --dark-strategy media|class:dark|attr:data-theme=dark
                                how dark mode is switched on (default media)
+  --locale-strategy browser|path:/{locale}|query:lang|cookie:NEXT_LOCALE|storage:i18nextLng
+                               how the app picks its language, on top of the
+                               browser locale and Accept-Language (default browser)
   --out .mantis                output directory
   --wait <ms>                  extra wait after network idle and web fonts
   --json                       print report.json to stdout
