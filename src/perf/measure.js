@@ -40,7 +40,7 @@ export const PERF_PROFILES = Object.freeze({
 
 /** Runs in the page before any of its scripts: keeps every performance entry Mantis needs. */
 function perfInitScript() {
-  const P = { lcp: [], shifts: [], longtasks: [], loafs: [], fcp: null, lcpElement: null, added: [], loaded: [], fontsDone: [] };
+  const P = { lcp: [], shifts: [], longtasks: [], loafs: [], fcp: null, added: [], loaded: [], fontsDone: [] };
   window.__mantisPerf = P;
   // What could have caused a layout shift: elements inserted after parsing, images and fonts arriving.
   let parsed = false;
@@ -54,9 +54,15 @@ function perfInitScript() {
     if (e.target.localName === 'img' && P.loaded.length < 500) P.loaded.push({ t: performance.now(), node: e.target });
   }, true);
   document.fonts?.addEventListener?.('loadingdone', () => P.fontsDone.push(performance.now()));
+  // Observers deliver their entries in a later task, which a busy machine can delay past the moment
+  // Mantis reads them: P.flush() takes what is still queued (takeRecords) before reading.
+  const observers = [];
+  P.flush = () => observers.forEach(({ po, fn }) => po.takeRecords().forEach(fn));
   const observe = (type, fn) => {
     try {
-      new PerformanceObserver((list) => list.getEntries().forEach(fn)).observe({ type, buffered: true });
+      const po = new PerformanceObserver((list) => list.getEntries().forEach(fn));
+      po.observe({ type, buffered: true });
+      observers.push({ po, fn });
     } catch {
       // entry type not supported by this browser
     }
@@ -65,8 +71,7 @@ function perfInitScript() {
     if (e.name === 'first-contentful-paint') P.fcp = e.startTime;
   });
   observe('largest-contentful-paint', (e) => {
-    P.lcp.push({ t: e.renderTime || e.loadTime || e.startTime, size: e.size, url: e.url || null });
-    P.lcpElement = e.element || P.lcpElement;
+    P.lcp.push({ t: e.renderTime || e.loadTime || e.startTime, size: e.size, url: e.url || null, element: e.element || null });
   });
   observe('layout-shift', (e) => {
     if (e.hadRecentInput) return;
@@ -214,6 +219,7 @@ async function recordFilmstrip(cdp, profile) {
 function collectInPage() {
   const M = window.__mantis;
   const P = window.__mantisPerf || { lcp: [], shifts: [], longtasks: [], loafs: [] };
+  P.flush?.();
   const nav = performance.getEntriesByType('navigation')[0];
   const sel = (el) => {
     try {
@@ -222,8 +228,9 @@ function collectInPage() {
       return null;
     }
   };
-  const lastLcp = P.lcp[P.lcp.length - 1] || null;
-  const lcpEl = P.lcpElement;
+  // LCP is the largest candidate: the biggest entry, the latest of equal ones, with an element.
+  const lastLcp = P.lcp.reduce((best, e) => (!best || e.size >= best.size ? e : best), null);
+  const lcpEl = lastLcp?.element ?? [...P.lcp].reverse().find((e) => e.element)?.element ?? null;
   let lcpElement = null;
   if (lcpEl) {
     const r = lcpEl.getBoundingClientRect();
