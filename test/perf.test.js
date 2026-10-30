@@ -188,17 +188,54 @@ describe('findings', () => {
       coverage: [{ url: 'https://shop.example.com/site.css', type: 'css', total: 80000, unused: 70000 }],
     }), mobile);
     const by = Object.fromEntries(found.map((f) => [f.category, f]));
-    assert.deepEqual(Object.keys(by).sort(), ['font', 'server', 'transfer', 'unused-code']);
+    assert.deepEqual(Object.keys(by).sort(), ['font', 'server', 'transfer', 'unused-css']);
     assert.equal(by.server.fixRisk, 'high');
     assert.equal(by.server.savings.ms, 1100);
     assert.equal(by.server.bucket, 'plan');
     assert.match(by.font.title, /Brand/);
     assert.equal(by.font.savings.ms, 1100, 'hidden from the font request until it arrives');
     assert.match(by.font.fix, /font-display: swap/);
-    assert.match(by['unused-code'].fix, /unused rules/);
+    assert.match(by['unused-css'].title, /88% of the CSS in \/site\.css matches nothing on this page/);
+    assert.match(by['unused-css'].fix, /unused rules/);
+    assert.equal(by['unused-css'].frameworkFix, null);
     assert.match(by.transfer.evidence, /cdn\.example\.com\/app\.js/, 'another subdomain of the same site is first-party');
     const local = findRouteIssues(route({}, { requests: [{ ...doc, url: 'http://127.0.0.1:3000/', serverWait: 50 }, { ...js, url: 'http://127.0.0.1:3000/app.js' }] }), mobile);
     assert.deepEqual(local, [], 'local servers rarely compress like production');
+  });
+
+  test('fonts: each file is tied to its @font-face, so only the files that hide text count', () => {
+    const o = 'http://127.0.0.1:3000';
+    const font = (name, start, end) => ({ url: `${o}/fonts/${name}.woff2`, method: 'GET', type: 'Font', start, end, bytes: 30000 });
+    const requests = [route().visit.requests[0], font('body', 300, 900), font('display', 300, 2600), font('icons', 400, 3900)];
+    const fontRules = [
+      { family: 'Body', display: 'swap', urls: [`${o}/fonts/body.woff2`] },
+      { family: 'Display', display: 'block', urls: [`${o}/fonts/display.woff2`] },
+    ];
+    const fonts = [{ family: 'Body', display: 'swap', status: 'loaded' }, { family: 'Display', display: 'block', status: 'loaded' }, { family: 'Icons', display: 'auto', status: 'loaded' }];
+    const [f] = findRouteIssues(route({}, { requests, fontRules, fonts }), mobile).filter((x) => x.category === 'font');
+    assert.equal(f.title, 'Text stays invisible until the web font arrives: Display');
+    assert.equal(f.savings.ms, 2300, 'display.woff2 only: the swap font and the unreadable icons file do not count');
+    assert.equal(f.culprit.url, `${o}/fonts/display.woff2`);
+    const swapOnly = findRouteIssues(route({}, { requests: requests.slice(0, 2), fontRules: fontRules.slice(0, 1), fonts: fonts.slice(0, 1) }), mobile);
+    assert.deepEqual(swapOnly.filter((x) => x.category === 'font'), []);
+  });
+
+  test('a minified bundle: the column finds the code, and 1:1 is its top level', () => {
+    const url = 'http://127.0.0.1:3000/assets/index-abc.js';
+    const hot = [{ fn: '(anonymous)', url, line: 1, column: 1, self: 60 }, { fn: 'xe', url, line: 1, column: 48211, self: 40 }];
+    const found = findRouteIssues(route({}, { hotFunctions: hot }), mobile);
+    assert.equal(found[0].title, 'The top-level code of /assets/index-abc.js holds the main thread for about 240 ms');
+    assert.match(found[0].fix, /Run less as the script loads/);
+    assert.equal(found[1].culprit.column, 48211);
+    assert.match(found[1].evidence, /index-abc\.js:1:48211 \(a minified bundle/);
+  });
+
+  test('a host that only serves fonts is a font host: self-host them', () => {
+    const fonts = [1, 2, 3].map((i) => ({ url: `https://assets.fontcdn.example/f${i}.woff2`, method: 'GET', type: 'Font', start: 300, end: 900, bytes: 30000 }));
+    const [v] = findRouteIssues(route({}, { requests: [route().visit.requests[0], ...fonts] }), mobile).filter((x) => x.category === 'third-party');
+    assert.equal(v.vendor.category, 'fonts');
+    assert.match(v.title, /fontcdn\.example \(fonts\): 88 KB/);
+    assert.match(v.fix, /Self-host the font files/);
   });
 
   test('layout shifts: grouped by cause, and a cause saves only what CLS would drop without it', () => {
@@ -540,6 +577,8 @@ describe('perf sheet', () => {
     assert.deepEqual(picks.map((p) => p.frame?.t ?? null), [300, 1200, 2500, 2500, 5100, 5900]);
     assert.ok(picks[0].fcp && picks[4].lcp);
     assert.deepEqual(pickFrames([], { fcp: 1, lcp: 2 }), []);
+    const close = pickFrames(frames.map((f, i) => ({ ...f, t: i * 1400 })), { fcp: 6200, lcp: 6600, count: 8 });
+    assert.ok(close.some((p) => p.fcp) && close.some((p) => p.lcp), 'marks close together get a frame each');
   });
 
   test('waterfall: the document, what blocks the first paint, the LCP image, API calls and big scripts', () => {

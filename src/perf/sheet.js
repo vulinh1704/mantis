@@ -28,12 +28,16 @@ export function pickFrames(frames, { fcp, lcp, count = 8 }) {
   const at = (t) => [...frames].reverse().find((f) => f.t <= t) ?? null;
   const times = Array.from({ length: count }, (_, i) => Math.round((end * (i + 1)) / count));
   const marks = [fcp, lcp].filter((t) => t != null);
+  const taken = new Set();
   for (const m of marks) {
-    let near = 0;
+    // the nearest step another mark hasn't taken, so close marks get a frame each
+    let near = -1;
     times.forEach((t, i) => {
-      if (Math.abs(t - m) < Math.abs(times[near] - m)) near = i;
+      if (!taken.has(i) && (near < 0 || Math.abs(t - m) < Math.abs(times[near] - m))) near = i;
     });
+    if (near < 0) continue;
     times[near] = Math.round(m);
+    taken.add(near);
   }
   return [...new Set(times)].sort((a, b) => a - b).map((t) => ({ t, frame: at(t), fcp: fcp != null && Math.abs(t - fcp) < 1, lcp: lcp != null && Math.abs(t - lcp) < 1 }));
 }
@@ -49,10 +53,14 @@ function filmstripHtml(route) {
   return `<section class="card wide"><h2>What the visitor sees<small>${escapeHtml(route.route)} · one cold visit</small></h2><div class="film">${cells}</div></section>`;
 }
 
-/** The requests that matter, as bars on a shared time axis with the first paint and LCP marked. */
+/**
+ * The requests that matter, as bars on a shared time axis with the first paint and LCP marked: the
+ * HTML, what blocks the first paint, the LCP image, API calls, big scripts and the first 3 fonts.
+ */
 export function waterfallRows(v, origin, max = 14) {
   const lcpUrl = v.lcpElement?.url;
-  const keep = v.requests.filter((q) => q.end != null && (q.type === 'Document' || q.renderBlocking || q.url === lcpUrl || q.type === 'Fetch' || q.type === 'XHR' || (q.type === 'Script' && (q.bytes ?? 0) > 10 * 1024)));
+  const fonts = new Set(v.requests.filter((q) => q.type === 'Font' && q.end != null).sort((a, b) => a.start - b.start).slice(0, 3));
+  const keep = v.requests.filter((q) => q.end != null && (q.type === 'Document' || q.renderBlocking || q.url === lcpUrl || q.type === 'Fetch' || q.type === 'XHR' || fonts.has(q) || (q.type === 'Script' && (q.bytes ?? 0) > 10 * 1024)));
   return keep.sort((a, b) => a.start - b.start).slice(0, max).map((q) => ({
     label: shortUrl(q.url, origin),
     kind: q.url === lcpUrl ? 'lcp' : q.renderBlocking ? 'block' : KIND[q.type] ?? 'other',
@@ -69,10 +77,12 @@ function waterfallHtml(route) {
   if (!rows.length) return '';
   const end = Math.max(...rows.map((r) => r.end), v.lcp ?? 0) * 1.04;
   const pct = (t) => `${((t / end) * 100).toFixed(2)}%`;
-  const lines = [v.fcp != null && `<i class="mark fcp" style="left:${pct(v.fcp)}"><span>first paint ${fmtMs(v.fcp)}</span></i>`, v.lcp != null && `<i class="mark lcp" style="left:${pct(v.lcp)}"><span>LCP ${fmtMs(v.lcp)}</span></i>`].filter(Boolean).join('');
+  // Labels of marks close together go on two lines.
+  const close = v.fcp != null && v.lcp != null && Math.abs(v.lcp - v.fcp) / end < 0.15;
+  const lines = [v.fcp != null && `<i class="mark fcp" style="left:${pct(v.fcp)}"><span>first paint ${fmtMs(v.fcp)}</span></i>`, v.lcp != null && `<i class="mark lcp" style="left:${pct(v.lcp)}"><span${close ? ' class="low"' : ''}>LCP ${fmtMs(v.lcp)}</span></i>`].filter(Boolean).join('');
   const body = rows.map((r) => `<div class="wrow"><span class="wl${r.third ? ' third' : ''}">${escapeHtml(r.label)}</span><span class="wt"><b class="bar ${r.kind}" style="left:${pct(r.start)};width:max(3px, ${pct(r.end - r.start)})"></b><em style="left:calc(${pct(r.end)} + 6px)">${fmtMs(r.end - r.start)}</em></span></div>`).join('');
-  const legend = [['block', 'holds first paint'], ['lcp', 'LCP image'], ['api', 'API'], ['js', 'script'], ['doc', 'HTML']].map(([k, t]) => `<span><b class="bar ${k}"></b>${t}</span>`).join('');
-  return `<section class="card span2"><h2>Waterfall<small>${legend}</small></h2><div class="wf"><div class="wlines">${lines}</div>${body}</div></section>`;
+  const legend = [['block', 'holds first paint'], ['lcp', 'LCP image'], ['api', 'API'], ['js', 'script'], ['font', 'font'], ['doc', 'HTML']].map(([k, t]) => `<span><b class="bar ${k}"></b>${t}</span>`).join('');
+  return `<section class="card span2"><h2>Waterfall<small>${legend}</small></h2><div class="wf${close ? ' two' : ''}"><div class="wlines">${lines}</div>${body}</div></section>`;
 }
 
 function fixesHtml(findings, origin) {
@@ -80,7 +90,7 @@ function fixesHtml(findings, origin) {
   if (!top.length) return `<section class="card"><h2>Fix first</h2><p class="clean">Nothing to do first or to plan.</p></section>`;
   const items = top.map((f, i) => {
     const c = f.culprit;
-    const where = c.fn ? `${c.fn} · ${shortUrl(c.url, origin)}${c.line ? `:${c.line}` : ''}` : c.selector ?? (c.url ? shortUrl(c.url, origin) : '');
+    const where = c.fn ? `${c.fn} · ${shortUrl(c.url, origin)}${c.line ? `:${c.line}${c.column ? `:${c.column}` : ''}` : ''}` : c.selector ?? (c.url ? shortUrl(c.url, origin) : '');
     return `<li><span class="num">${i + 1}</span><div><b>${escapeHtml(f.title.replace(/`/g, ''))}</b><code>${escapeHtml(where)}</code></div><span class="save ${f.bucket}">${escapeHtml(savingLabel(f))}<small>${f.bucket === 'do-first' ? 'do first' : 'plan'} · risk ${f.fixRisk}</small></span></li>`;
   }).join('');
   return `<section class="card"><h2>Fix first<small>impact × fix risk</small></h2><ol class="fixes">${items}</ol></section>`;
@@ -90,7 +100,7 @@ function vendorsHtml(findings) {
   const vendors = findings.filter((f) => f.category === 'third-party' && f.vendor).map((f) => f.vendor);
   if (!vendors.length) return '';
   const top = Math.max(...vendors.map((x) => x.mainThreadMs), 1);
-  const rows = vendors.sort((a, b) => b.mainThreadMs - a.mainThreadMs).slice(0, 6).map((x) => `<div class="vrow"><span class="vn">${escapeHtml(x.name)}<em>${escapeHtml(x.category === 'other' ? 'third party' : x.category)}</em></span><span class="vb"><b style="width:${((x.mainThreadMs / top) * 100).toFixed(1)}%"></b></span><span class="vv">${fmtMs(x.mainThreadMs)}<em>${fmtKb(x.bytes)}</em></span></div>`).join('');
+  const rows = vendors.sort((a, b) => b.mainThreadMs - a.mainThreadMs).slice(0, 6).map((x) => `<div class="vrow"><span class="vn"><b>${escapeHtml(x.name)}</b><em>${escapeHtml(x.category === 'other' ? 'third party' : x.category)}</em></span><span class="vb"><b style="width:${((x.mainThreadMs / top) * 100).toFixed(1)}%"></b></span><span class="vv">${fmtMs(x.mainThreadMs)}<em>${fmtKb(x.bytes)}</em></span></div>`).join('');
   return `<section class="card"><h2>Third parties<small>main thread on this profile</small></h2>${rows}</section>`;
 }
 
@@ -138,6 +148,7 @@ export function perfSheetHtml(report, project = null) {
 .wf { position:relative; padding-top:24px; } .wlines { position:absolute; left:260px; right:70px; top:0; bottom:0; pointer-events:none; }
 .mark { position:absolute; top:0; bottom:0; border-left:2px dashed var(--ink); } .mark.lcp { border-color:var(--accent); }
 .mark span { position:absolute; top:0; left:5px; font-style:normal; font-size:11px; font-weight:800; white-space:nowrap; } .mark.lcp span { color:var(--accent); }
+.wf.two { padding-top:38px; } .mark span.low { top:16px; }
 .wrow { display:grid; grid-template-columns: 260px 1fr; align-items:center; height:26px; }
 .wl { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding-right:12px; font-family:var(--mono); font-size:12px; } .wl.third { color:var(--warn); }
 .wt { position:relative; height:100%; margin-right:70px; }
@@ -146,14 +157,16 @@ export function perfSheetHtml(report, project = null) {
 .wt em { position:absolute; top:5px; font-style:normal; font-family:var(--mono); font-size:11px; color:var(--muted); white-space:nowrap; }
 h2 small span { display:inline-flex; align-items:center; gap:5px; } h2 small .bar { position:static; display:inline-block; width:14px; height:10px; }
 .fixes { list-style:none; display:flex; flex-direction:column; gap:12px; }
-.fixes li { display:grid; grid-template-columns: 26px 1fr auto; gap:10px; align-items:start; padding-bottom:12px; border-bottom:1px dashed var(--line); }
+.fixes li { display:grid; grid-template-columns: 26px minmax(0, 1fr) auto; gap:10px; align-items:start; padding-bottom:12px; border-bottom:1px dashed var(--line); }
 .fixes .num { display:flex; align-items:center; justify-content:center; width:24px; height:24px; border-radius:50%; background:var(--ink); color:#fff; font-size:13px; font-weight:800; }
-.fixes b { display:block; font-size:15px; line-height:1.3; } .fixes code { font-family:var(--mono); font-size:12px; color:var(--muted); }
+.fixes b { display:block; font-size:15px; line-height:1.3; overflow-wrap:anywhere; }
+.fixes code { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-family:var(--mono); font-size:12px; color:var(--muted); }
 .save { display:flex; flex-direction:column; align-items:flex-end; font-family:var(--mono); font-size:14px; font-weight:800; white-space:nowrap; } .save.do-first { color:var(--ok); } .save.plan { color:var(--warn); }
 .save small { font-family:Inter, system-ui, sans-serif; font-size:11px; font-weight:600; color:var(--muted); }
 .clean { color:var(--ok); font-weight:700; font-size:16px; }
-.vrow { display:grid; grid-template-columns: 150px 1fr 90px; gap:12px; align-items:center; padding:7px 0; }
-.vn { display:flex; flex-direction:column; font-weight:700; font-size:14px; overflow:hidden; } .vn em, .vv em { font-style:normal; font-weight:500; font-size:12px; color:var(--muted); }
+.vrow { display:grid; grid-template-columns: 190px minmax(0, 1fr) 90px; gap:12px; align-items:center; padding:7px 0; }
+.vn { display:flex; flex-direction:column; min-width:0; font-weight:700; font-size:14px; } .vn em, .vv em { font-style:normal; font-weight:500; font-size:12px; color:var(--muted); }
+.vn b { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:700; }
 .vb { height:14px; border-radius:4px; background:#efe9dd; overflow:hidden; } .vb b { display:block; height:100%; background:var(--warn); }
 .vv { display:flex; flex-direction:column; align-items:flex-end; font-family:var(--mono); font-size:14px; font-weight:800; }
 </style></head><body${brandStyle(project)}>

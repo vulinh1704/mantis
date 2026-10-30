@@ -314,6 +314,32 @@ function collectInPage() {
     window.__NEXT_DATA__?.buildId === 'development' && 'Next.js dev server',
     has(/webpack-dev-server|sockjs-node/) && 'webpack dev server',
   ].filter(Boolean);
+  // @font-face rules with the files they point to, from the stylesheets the page can read (not
+  // cross-origin ones), to tie each font file to its font-display.
+  function fontFaceRules() {
+    const out = [];
+    for (const sheet of document.styleSheets) {
+      let rules;
+      try {
+        rules = sheet.cssRules;
+      } catch {
+        continue;
+      }
+      for (const rule of rules) {
+        if (!(rule instanceof CSSFontFaceRule) || out.length >= 200) continue;
+        const base = sheet.href || location.href;
+        const urls = [...rule.style.getPropertyValue('src').matchAll(/url\(\s*(['"]?)([^'")]+)\1\s*\)/g)].map((m) => {
+          try {
+            return new URL(m[2], base).href;
+          } catch {
+            return null;
+          }
+        }).filter(Boolean);
+        out.push({ family: rule.style.getPropertyValue('font-family').trim().replace(/^["']|["']$/g, ''), display: rule.style.getPropertyValue('font-display') || 'auto', urls });
+      }
+    }
+    return out;
+  }
   const text = (document.body?.innerText || '').replace(/\s+/g, ' ').trim();
   return {
     nav: nav ? { ttfb: Math.round(nav.responseStart), dcl: Math.round(nav.domContentLoadedEventEnd), load: Math.round(nav.loadEventEnd), transfer: nav.transferSize } : null,
@@ -322,6 +348,7 @@ function collectInPage() {
     lcpElement,
     shifts: P.shifts.map((s) => ({ t: Math.round(s.t), value: s.value, sources: s.nodes.map(sel).filter(Boolean).slice(0, 4), cause: causeOf(s) })),
     fonts: document.fonts ? [...document.fonts].map((f) => ({ family: f.family.replace(/^["']|["']$/g, ''), display: f.display, status: f.status })) : [],
+    fontRules: fontFaceRules(),
     iframes: [...document.querySelectorAll('iframe[src]')].slice(0, 30).map((f) => {
       const r = f.getBoundingClientRect();
       return { selector: sel(f), src: f.src, loading: f.getAttribute('loading'), inViewport: r.bottom > 0 && r.top < vh && r.width > 0 && r.height > 0 };

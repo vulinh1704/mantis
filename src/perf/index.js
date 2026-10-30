@@ -231,7 +231,7 @@ export function renderPerfMarkdown(report) {
         const where = [
           c.selector && `\`${c.selector}\``,
           c.fn && `\`${c.fn}\``,
-          c.url && `${shortUrl(c.url, origin)}${c.line ? `:${c.line}` : ''}`,
+          c.url && `${shortUrl(c.url, origin)}${c.line ? `:${c.line}${c.column ? `:${c.column}` : ''}` : ''}`,
           c.from && `(loaded from ${shortUrl(c.from, origin)})`,
           c.calledFrom && `(called from ${shortUrl(c.calledFrom, origin)})`,
           c.waitedFor && `(waited for ${shortUrl(c.waitedFor, origin)})`,
