@@ -250,6 +250,25 @@ function collectInPage() {
       natural: isImg ? { width: lcpEl.naturalWidth, height: lcpEl.naturalHeight } : null,
     };
   }
+  // Chrome now and then emits no LCP entry for an image it did paint (seen in 1 of 5 desktop visits
+  // on a CI runner). Such an image loaded after the last candidate, is on screen and much larger.
+  // Images Chrome leaves out on purpose are skipped: low entropy (placeholders), covering the whole
+  // viewport (backgrounds), or transparent.
+  let lcpMissed = null;
+  const lcpSize = lastLcp?.size ?? 0;
+  for (const l of P.loaded) {
+    const img = l.node;
+    if (!img.isConnected || !img.naturalWidth || l.t <= (lastLcp?.t ?? 0)) continue;
+    const r = img.getBoundingClientRect();
+    const w = Math.max(0, Math.min(r.right, innerWidth) - Math.max(r.left, 0));
+    const h = Math.max(0, Math.min(r.bottom, innerHeight) - Math.max(r.top, 0));
+    if (w >= innerWidth && h >= innerHeight) continue;
+    if (Number(getComputedStyle(img).opacity) === 0) continue;
+    const area = Math.min(w * h, img.naturalWidth * img.naturalHeight);
+    const bytes = performance.getEntriesByName(img.currentSrc)[0]?.encodedBodySize ?? 0;
+    if (bytes && (bytes * 8) / (w * h) < 0.05) continue;
+    if (area > lcpSize * 1.5 && (!lcpMissed || area > lcpMissed.area)) lcpMissed = { selector: sel(img), loadedAt: Math.round(l.t), area: Math.round(area) };
+  }
   // The likeliest cause of each layout shift, above the elements that moved. Candidates: an element
   // inserted (or a container filled) or an image loaded in the second before it, and any image with
   // no size (on a slow network its size is known, and the page jumps, long before it has loaded).
@@ -353,6 +372,7 @@ function collectInPage() {
     fcp: P.fcp != null ? Math.round(P.fcp) : null,
     lcp: lastLcp ? Math.round(lastLcp.t) : null,
     lcpElement,
+    lcpMissed,
     // every candidate Chrome reported, in order: the LCP is the largest
     lcpCandidates: P.lcp.slice(-10).map((e) => ({ t: Math.round(e.t), size: e.size, url: e.url, tag: e.element?.localName ?? null })),
     shifts: P.shifts.map((s) => ({ t: Math.round(s.t), value: s.value, sources: s.nodes.map(sel).filter(Boolean).slice(0, 4), cause: causeOf(s) })),

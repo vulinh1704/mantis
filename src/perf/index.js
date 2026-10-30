@@ -44,6 +44,22 @@ export function representative(visits, agg) {
 }
 
 /**
+ * The visits whose LCP to trust. Chrome now and then reports no LCP entry for a larger image it
+ * painted after the last one it reported (measure.js flags it as lcpMissed): those visits are left
+ * out of LCP when others have it right, and the report says so either way.
+ */
+export function lcpVisits(visits) {
+  const missed = visits.filter((v) => v.lcpMissed);
+  if (!missed.length) return { use: visits, note: null };
+  const { selector, loadedAt } = missed[0].lcpMissed;
+  const clean = visits.filter((v) => !v.lcpMissed);
+  if (clean.length) {
+    return { use: clean, note: `Chrome reported no LCP entry for \`${selector}\` in ${missed.length} of ${visits.length} visits, although it painted it after what it reported and it is larger: those visits are left out of LCP.` };
+  }
+  return { use: visits, note: `Chrome reported no LCP entry for \`${selector}\`, although it loaded at ${fmtMs(loadedAt)} and is larger than what it reported: LCP may be too low here. Measure again.` };
+}
+
+/**
  * Give each request of a throttled visit the server's real wait from the unthrottled visit: the
  * n-th `GET /api/x` of one gets the n-th `GET /api/x` of the other.
  */
@@ -99,7 +115,10 @@ export async function perf(opts, { log = () => {} } = {}) {
         continue;
       }
       const metrics = aggregate(visits);
-      const rep = visits[representative(visits, metrics)];
+      const trusted = lcpVisits(visits);
+      if (trusted.use !== visits) metrics.lcp = aggregate(trusted.use).lcp;
+      if (trusted.note) notes.push(trusted.note);
+      const rep = trusted.use[representative(trusted.use, metrics)];
       if (rep.devSigns.length) notes.unshift(`Measured a development server (${rep.devSigns.join(', ')}): its numbers are not what users get. Measure a production build (npm run build && npm run preview, next start…).`);
       frames.set(route, pickFrames(rep.filmstrip, { fcp: rep.fcp, lcp: rep.lcp }));
       routes.push({

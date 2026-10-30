@@ -2,6 +2,14 @@
 
 Full notes, with images, are on the [releases page](https://github.com/vulinh1704/mantis/releases).
 
+## Unreleased
+
+- `mantis perf`: Chrome now and then reports no LCP entry for an image it did paint. This happened in 1 of 5 desktop visits on a CI runner and 1 in 10 under load locally, and the LCP fell back to a heading. Mantis now flags such a visit: an image on screen that loaded after the last candidate and is much larger. Images Chrome leaves out on purpose are skipped: placeholders, full-viewport backgrounds, transparent images.
+  - A flagged visit is left out of the LCP median and is never the representative visit, and the report says so.
+  - When every visit is flagged, the report warns that LCP may be too low.
+  - perf.json also lists the LCP candidates Chrome reported.
+  - Queued performance entries are read before a visit is read (takeRecords).
+
 ## 0.7.0 (2026-10-30)
 
 - `mantis mcp` serves Mantis to any MCP client over stdio, with four tools that take the CLI's options: `mantis_look`, `mantis_perf`, `mantis_learn` and `mantis_proof`. Each returns its report as text and its sheet as an image, and reports progress while it runs. `claude mcp add mantis -- npx -y @vulinh1704/mantis mcp`. No new dependencies. `server.json` describes the server for the MCP Registry (`io.github.vulinh1704/mantis`).
