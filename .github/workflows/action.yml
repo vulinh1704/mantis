@@ -1,0 +1,102 @@
+name: Action
+
+# Runs the GitHub Action in this repository (action.yml) on the fixtures, with Mantis installed
+# from this checkout, and checks its outputs. On a pull request it also comments, as users see it.
+on:
+  pull_request:
+    paths: [action.yml, 'action/**', 'src/**', 'fixtures/**', '.github/workflows/action.yml']
+  push:
+    branches: [main]
+    paths: [action.yml, 'action/**', '.github/workflows/action.yml']
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  look:
+    name: action (look, compared with a baseline)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Pack this checkout
+        id: pack
+        run: echo "tgz=$PWD/$(npm pack --silent)" >> "$GITHUB_OUTPUT"
+
+      - name: Serve the fixtures
+        run: |
+          node test/helpers/static-server.js fixtures/clean-app 4322 &
+          node test/helpers/static-server.js fixtures/buggy-app 4321 &
+          sleep 1
+
+      - name: Mantis look on buggy-app, with clean-app as the baseline
+        id: mantis
+        uses: ./
+        with:
+          url: http://127.0.0.1:4321/
+          baseline-url: http://127.0.0.1:4322/
+          viewports: mobile
+          schemes: light
+          fail-on: never
+          package: ${{ steps.pack.outputs.tgz }}
+
+      - name: Check the outputs
+        env:
+          ERRORS: ${{ steps.mantis.outputs.errors }}
+          EXIT: ${{ steps.mantis.outputs.exit-code }}
+          REPORT: ${{ steps.mantis.outputs.report }}
+          ARTIFACT: ${{ steps.mantis.outputs.artifact-url }}
+        run: |
+          echo "errors=$ERRORS exit=$EXIT report=$REPORT artifact=$ARTIFACT"
+          test "$EXIT" = 1
+          test "$ERRORS" -gt 0
+          test -f "$REPORT"
+          test -n "$ARTIFACT"
+          grep -q "compared with" .mantis/action-comment-look.md
+
+  perf:
+    name: action (perf)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Pack this checkout
+        id: pack
+        run: echo "tgz=$PWD/$(npm pack --silent)" >> "$GITHUB_OUTPUT"
+
+      - name: Serve slow-app
+        run: |
+          node test/helpers/slow-server.js 4330 &
+          sleep 1
+
+      - name: Mantis perf on slow-app
+        id: mantis
+        uses: ./
+        with:
+          url: http://127.0.0.1:4330/
+          command: perf
+          runs: 1
+          profile: desktop
+          fail-on: never
+          package: ${{ steps.pack.outputs.tgz }}
+
+      - name: Check the outputs
+        env:
+          ERRORS: ${{ steps.mantis.outputs.errors }}
+          EXIT: ${{ steps.mantis.outputs.exit-code }}
+          REPORT: ${{ steps.mantis.outputs.report }}
+        run: |
+          echo "errors=$ERRORS exit=$EXIT report=$REPORT"
+          test "$EXIT" = 1
+          test "$ERRORS" -gt 0
+          grep -q "Fixes, ranked" "$REPORT"
+          grep -q "Fix first" .mantis/action-comment-perf.md
