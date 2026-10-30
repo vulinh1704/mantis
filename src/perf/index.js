@@ -6,8 +6,9 @@
 import { cp, mkdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { launchBrowser, preflight } from '../look.js';
-import { readStorageState } from '../options.js';
+import { readStorageState, storageStateName } from '../options.js';
 import { VERSION, ensureOutDir, firstLine, runIdFor, uniqueDir } from '../util.js';
+import { METRIC_NAME, comparePerf, fmtMetric, findPerfBaseline } from './compare.js';
 import { BUCKETS, findRouteIssues, rankFindings, savingLabel } from './findings.js';
 import { PERF_PROFILES, measureTrace, measureVisit } from './measure.js';
 import { fmtKb, fmtMs, median, rating, shortUrl } from './metrics.js';
@@ -63,6 +64,8 @@ export async function perf(opts, { log = () => {} } = {}) {
   const startedAt = new Date();
   const profile = PERF_PROFILES[opts.profile];
   const session = opts.storageState ? await readStorageState(opts.storageState) : null;
+  // Found before measuring, so a wrong --baseline fails fast (and `auto` never finds this run).
+  const base = await findPerfBaseline({ baseline: opts.baseline, out: opts.out, url: opts.url, profile: opts.profile, storageState: opts.storageState });
   const browser = await launchBrowser();
   try {
     await preflight(browser, new URL(opts.routes[0], opts.baseUrl).href, session);
@@ -118,12 +121,15 @@ export async function perf(opts, { log = () => {} } = {}) {
       finishedAt: new Date().toISOString(),
       durationMs: Date.now() - startedAt.getTime(),
       profile: { name: profile.name, label: profile.label },
+      storageState: storageStateName(opts.storageState),
       runs: opts.runs,
       summary: { findings: findings.length, ...counts },
+      baseline: null,
       findings,
       routes,
     };
     const outDir = path.resolve(opts.out);
+    if (base) report.baseline = { ...comparePerf(base, report), dir: path.relative(outDir, base.dir) || base.dir };
     await ensureOutDir(outDir);
     const runDir = await uniqueDir(path.join(outDir, 'perf', 'runs'), runIdFor(startedAt));
     report.runId = path.basename(runDir);
@@ -134,7 +140,8 @@ export async function perf(opts, { log = () => {} } = {}) {
     await mkdir(path.dirname(latestDir), { recursive: true });
     await cp(runDir, latestDir, { recursive: true });
     const failed = routes.some((r) => r.status === 'failed');
-    return { report, runDir, latestDir, exitCode: failed ? 2 : counts['do-first'] + counts.plan > 0 ? 1 : 0 };
+    const coverUps = report.baseline?.coverUps.length ?? 0;
+    return { report, runDir, latestDir, exitCode: failed ? 2 : counts['do-first'] + counts.plan + coverUps > 0 ? 1 : 0 };
   } finally {
     await browser.close().catch(() => {});
   }
@@ -150,6 +157,27 @@ export function renderPerfMarkdown(report) {
   const lines = ['# Mantis perf report', ''];
   lines.push(`\`${report.url}\` · ${report.profile.label} · median of ${report.runs} cold visit${report.runs === 1 ? '' : 's'} per route · ${(report.durationMs / 1000).toFixed(0)}s`, '');
   lines.push('INP needs real interactions, which a lab run does not have: TBT and the long animation frames below stand in for responsiveness.', '');
+  const b = report.baseline;
+  if (b) {
+    lines.push(`## Compared with ${b.runId}`, '', `**${b.receipt}**`, '');
+    for (const c of b.coverUps) {
+      lines.push(`> **Faster, or just emptier?** \`${c.route}\`: ${c.improved.join(', ')}, but ${c.reasons.join('; ')}. A metric that improves because content is gone is not a fix: put the content back and fix the cause (fine if the content changed on purpose).`, '');
+    }
+    lines.push('| route | metric | before | after | change |', '|---|---|---|---|---|');
+    for (const r of b.routes) {
+      for (const [m, d] of Object.entries(r.deltas)) {
+        const change = d.significant ? `${d.delta < 0 ? '−' : '+'}${fmtMetric(m, Math.abs(d.delta))} ${d.better ? 'better' : '**worse**'}` : `within noise (±${fmtMetric(m, d.noise)})`;
+        lines.push(`| \`${r.route}\` | ${METRIC_NAME[m]} | ${fmtMetric(m, d.before)} | ${fmtMetric(m, d.after)} | ${change} |`);
+      }
+    }
+    lines.push('');
+    const list = (title, items) => {
+      if (items.length) lines.push(`**${title}**`, '', ...items.map((f) => `- ${f.title}`), '');
+    };
+    list('Fixed', b.fixed);
+    list('Gone with the content (not counted as fixed)', b.goneWithContent);
+    list('New', b.new);
+  }
   const findings = report.findings ?? [];
   if (findings.length) {
     lines.push('## Fixes, ranked', '');

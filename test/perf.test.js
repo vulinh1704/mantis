@@ -355,7 +355,6 @@ describe('parsePerfArgs', () => {
     assert.throws(() => parsePerfArgs(['http://x', '--runs', '0']), /--runs must be between 1 and 15/);
     assert.throws(() => parsePerfArgs(['http://x', '--profile', 'tablet']), /unknown --profile "tablet"/);
     assert.throws(() => parsePerfArgs(['http://x', '--viewports', 'mobile']), UsageError);
-    assert.throws(() => parsePerfArgs(['http://x', '--baseline', 'none']), UsageError, 'not until perf baselines exist');
   });
 });
 

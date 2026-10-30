@@ -34,6 +34,9 @@ Full notes, with images, are on the [releases page](https://github.com/vulinh170
     - the fix that suits the kind of vendor (a facade for chat and video, a static map, loading analytics after the page is interactive, self-hosting fonts).
 
     A costly vendor also gets a "your call" entry: whether it is worth it is a product decision.
+- `mantis perf --baseline auto|none|<dir>` compares a run with the previous one of the same URL, profile and storage state. It prints a receipt: `LCP 2.5 s → 36 ms · TBT 121 ms → 0 ms · CLS 0.164 → 0 · 11 fixed · 0 new · 0 cover-ups`.
+  - A metric counts as changed only beyond the noise: both runs' spread, 5%, and a floor per metric. Anything less is "within noise".
+  - **Perf cover-ups:** a route that got faster because it got emptier is an error, "Faster, or just emptier?". That covers the LCP image turned into text or shrunk, visible text down more than 20%, and first-screen images, headings or controls gone. Findings that went away with the content are listed apart and are not counted as fixed. Exit code 1.
 
 ## 0.5.1 (2026-10-30)
 
