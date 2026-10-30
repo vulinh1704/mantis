@@ -40,7 +40,7 @@ looks right" is not evidence. A Mantis run with zero errors is.
 mantis look http://localhost:3000 --routes /,/settings
 ```
 
-If `mantis` isn't installed, run `npx -y @vulinh1704/mantis@0.6.0 look …` instead.
+If `mantis` isn't installed, run `npx -y @vulinh1704/mantis@0.7.0 look …` instead.
 Without Node or a browser, use the Docker image (`ghcr.io/vulinh1704/mantis`, see the
 README for how it reaches a dev server on the host).
 
