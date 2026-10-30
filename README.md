@@ -98,6 +98,73 @@ Mantis: 0 errors, 0 warnings in 24 cells
   vs 2026-10-29T11-51-22: 18 fixed · 0 new · 0 cover-ups · 0 lost
 ```
 
+## Numbers
+
+What has been measured so far:
+
+- **Planted bugs.** `fixtures/buggy-app` has 13 planted UI bugs, listed in
+  [`PLANTED.json`](fixtures/buggy-app/PLANTED.json). Mantis reports every one
+  of them in exactly the screen, theme and language cells where it was planted,
+  and nothing else. On `fixtures/clean-app`, the same app with every bug fixed,
+  it reports zero issues. Both checks run in CI.
+- **Cover-ups.** Four tricks applied to `buggy-app` behind the same URL (hide
+  the overflow with `overflow-x: hidden`, hide the menu button, hide the button
+  it overlaps, shrink a label to 7px) are all still reported or flagged as
+  cover-ups. Swapping in `clean-app`, the honest fix, gives every issue fixed,
+  0 new, 0 cover-ups and 0 lost. This runs in CI too.
+- **Cover-up false alarms.** Two runs in a row on tailwindcss.com, vercel.com,
+  notion.com and stripe.com reported 0 cover-ups and 0 lost controls. On
+  vnexpress.net, where the news changes between runs, they reported 0 cover-ups
+  and one grouped "lost" warning. Checked on 2026-10-29.
+- **Real sites.** On 10 public sites (example.com, playwright.dev, Hacker News,
+  tailwindcss.com, MDN, svelte.dev, react.dev, gov.uk, vercel.com and
+  stripe.com), 18 of the 21 errors it reported held up when checked by hand.
+  The 3 false positives were demo frames on tailwindcss.com. Checked on
+  2026-10-26.
+- **House style.** On `buggy-app`, `mantis learn` lists exactly the 3 near-duplicates planted there:
+  - a color ΔE 0.4 from `--muted`;
+  - a 13.6px label in a 14px scale;
+  - a 15px corner next to `--radius: 16px`.
+
+  On `clean-app` it finds none. Each of four near copies hard-coded into `clean-app` (a color, a font size, a radius and a font) gives one `off-style` warning; a clearly new color gives none. These checks run in CI.
+- **Off-style false alarms.** Learning a public page and looking at it again right away gave 0 off-style warnings on tailwindcss.com and vercel.com. stripe.com gave 2, linear.app 4 and github.com 4. All 10 were inside live product demos or a lazily loaded repo grid, whose content changes between loads. Checked on 2026-10-29.
+
+### Agent benchmark
+
+The same agent (Claude Code, Opus 5.5 and Haiku 5.5) did the same UI tasks with
+and without the Mantis skills, 3 runs per cell, graded by a hidden Playwright
+grader that never uses Mantis's detectors. Everything is in [`bench/`](bench/):
+the method, the planted bugs, the graders, every agent's final report and diff,
+the ties and the losses.
+
+- **Mantis did not make Opus 5.5 fix more bugs.** It tied on two small apps
+  (13.0 vs 12.7 of 13, 9 vs 9 of 9). On a fork of Excalidraw it was behind with
+  v0.3.1 (6.0 vs 6.7 of 7) and ahead with v0.4.0 (7.0 vs 6.7). Those fixes were
+  tuned on that same fork.
+- **Under pressure, it got hidden bugs reported.** Told "make `check:ui` pass,
+  keep it small", both arms fixed only what the check covers. With Mantis, the
+  final report also listed the bugs the check can't see: 3.7 of 5 against 1.7
+  (Opus, Atlas), and 4 of 4 in every run against 0 (Opus, Excalidraw, v0.4.0).
+- **When Mantis is blind, the agent is too.** With v0.3.1, which could not
+  measure contrast on a canvas, agents using Mantis fixed a 1.27:1 button less
+  often than agents without it.
+- **No agent in either arm covered a bug up:** 0 in 72 graded runs.
+
+## Why not …?
+
+**A browser MCP or a screenshot script?** Playwright MCP, Chrome DevTools MCP and agent-browser give the agent a browser. The agent still has to decide which screens to open and judge each screenshot by eye. Mantis runs on Playwright and adds the parts an agent skips:
+- the same matrix every time: phone, tablet and desktop × light and dark × every language;
+- detectors that name the element and give the measurements behind each finding;
+- a comparison with the last run that catches fixes which only hide a bug.
+
+In [our benchmarks](bench/), Opus 5.5 without Mantis wrote its own Playwright scripts and fixed about as many bugs. The difference was under pressure: with Mantis, the agent still told the user what the CI check couldn't see.
+
+**ProofShot?** ProofShot records what the agent did (video, screenshots and errors) into a proof bundle you can review. Mantis checks for specific kinds of breakage across the matrix, and fails the run when a fix only hides one. One answers "what happened?"; the other answers "is it broken, and was it really fixed?"
+
+**Impeccable?** Impeccable's `detect` checks a page against design rules, so the UI doesn't look generic. Mantis checks that it works: nothing overflows, every label is readable in both themes and every language, and fixes are real. Impeccable makes it tasteful; Mantis proves it isn't broken. Use both.
+
+**Visual regression (Percy, Chromatic, BackstopJS)?** These compare screenshots with an approved baseline and ask a person to review each change. Mantis finds bugs on the first run, with no baseline, and says what is wrong and where. It compares with the previous run only to catch cover-ups.
+
 ## Mantis has no taste. It has yours.
 
 `mantis learn` opens the running app and measures the house style it actually uses, with no design spec to write first:
@@ -187,58 +254,6 @@ docker run --rm --network host --user "$(id -u):$(id -g)" -v "$PWD:/work" ghcr.i
 ```
 
 The report lands in `./.mantis` as usual. A storage state file in the mounted directory works as `--storage-state .mantis/auth.json`.
-
-## Numbers
-
-What has been measured so far:
-
-- **Planted bugs.** `fixtures/buggy-app` has 13 planted UI bugs, listed in
-  [`PLANTED.json`](fixtures/buggy-app/PLANTED.json). Mantis reports every one
-  of them in exactly the screen, theme and language cells where it was planted,
-  and nothing else. On `fixtures/clean-app`, the same app with every bug fixed,
-  it reports zero issues. Both checks run in CI.
-- **Cover-ups.** Four tricks applied to `buggy-app` behind the same URL (hide
-  the overflow with `overflow-x: hidden`, hide the menu button, hide the button
-  it overlaps, shrink a label to 7px) are all still reported or flagged as
-  cover-ups. Swapping in `clean-app`, the honest fix, gives every issue fixed,
-  0 new, 0 cover-ups and 0 lost. This runs in CI too.
-- **Cover-up false alarms.** Two runs in a row on tailwindcss.com, vercel.com,
-  notion.com and stripe.com reported 0 cover-ups and 0 lost controls. On
-  vnexpress.net, where the news changes between runs, they reported 0 cover-ups
-  and one grouped "lost" warning. Checked on 2026-10-29.
-- **Real sites.** On 10 public sites (example.com, playwright.dev, Hacker News,
-  tailwindcss.com, MDN, svelte.dev, react.dev, gov.uk, vercel.com and
-  stripe.com), 18 of the 21 errors it reported held up when checked by hand.
-  The 3 false positives were demo frames on tailwindcss.com. Checked on
-  2026-10-26.
-- **House style.** On `buggy-app`, `mantis learn` lists exactly the 3 near-duplicates planted there:
-  - a color ΔE 0.4 from `--muted`;
-  - a 13.6px label in a 14px scale;
-  - a 15px corner next to `--radius: 16px`.
-
-  On `clean-app` it finds none. Each of four near copies hard-coded into `clean-app` (a color, a font size, a radius and a font) gives one `off-style` warning; a clearly new color gives none. These checks run in CI.
-- **Off-style false alarms.** Learning a public page and looking at it again right away gave 0 off-style warnings on tailwindcss.com and vercel.com. stripe.com gave 2, linear.app 4 and github.com 4. All 10 were inside live product demos or a lazily loaded repo grid, whose content changes between loads. Checked on 2026-10-29.
-
-### Agent benchmark
-
-The same agent (Claude Code, Opus 5.5 and Haiku 5.5) did the same UI tasks with
-and without the Mantis skills, 3 runs per cell, graded by a hidden Playwright
-grader that never uses Mantis's detectors. Everything is in [`bench/`](bench/):
-the method, the planted bugs, the graders, every agent's final report and diff,
-the ties and the losses.
-
-- **Mantis did not make Opus 5.5 fix more bugs.** It tied on two small apps
-  (13.0 vs 12.7 of 13, 9 vs 9 of 9). On a fork of Excalidraw it was behind with
-  v0.3.1 (6.0 vs 6.7 of 7) and ahead with v0.4.0 (7.0 vs 6.7). Those fixes were
-  tuned on that same fork.
-- **Under pressure, it got hidden bugs reported.** Told "make `check:ui` pass,
-  keep it small", both arms fixed only what the check covers. With Mantis, the
-  final report also listed the bugs the check can't see: 3.7 of 5 against 1.7
-  (Opus, Atlas), and 4 of 4 in every run against 0 (Opus, Excalidraw, v0.4.0).
-- **When Mantis is blind, the agent is too.** With v0.3.1, which could not
-  measure contrast on a canvas, agents using Mantis fixed a 1.27:1 button less
-  often than agents without it.
-- **No agent in either arm covered a bug up:** 0 in 72 graded runs.
 
 ## Limits
 
