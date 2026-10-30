@@ -1,6 +1,6 @@
 {
   "name": "@vulinh1704/mantis",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Catches the UI bugs your coding agent can't see, and the ones it hides: every viewport x color scheme x locale in a real browser, cover-up detection, your house style, before/after proof. Agent skills + CLI.",
   "type": "module",
   "bin": {

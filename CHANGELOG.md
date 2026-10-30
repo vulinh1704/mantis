@@ -2,7 +2,7 @@
 
 Full notes, with images, are on the [releases page](https://github.com/vulinh1704/mantis/releases).
 
-## Unreleased
+## 0.5.1 (2026-10-30)
 
 Fixes from a review of 0.5.0 (#30):
 - Markers on right-to-left pages are drawn where the culprit is, also left of x = 0.
