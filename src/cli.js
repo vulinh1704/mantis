@@ -29,7 +29,8 @@ in <out>/latest.
   --schemes light,dark         color schemes (default both)
   --locales en,vi              locales (default en); a locale whose page text is
                                identical to the first one is marked "not localized";
-                               "pseudo" rewrites the first language's text ~40% longer
+                               "pseudo" rewrites the first language's text ~40% longer,
+                               "pseudo-rtl" also lays it out right to left
   --dark-strategy media|class:dark|attr:data-theme=dark
                                how dark mode is switched on (default media)
   --locale-strategy browser|path:/{locale}|query:lang|cookie:NEXT_LOCALE|storage:i18nextLng

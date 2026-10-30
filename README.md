@@ -48,6 +48,7 @@ Then someone opens the page on a phone:
 |---|---|---|
 | Page overflow | Sideways scrolling on a phone | They picture the desktop layout |
 | Cut-off text | "Đăng ký nhận bản ti…" | They test with short English strings |
+| Right-to-left mistakes | Arabic laid out left to right, a row cut off on the left | They never switch the page to `dir="rtl"` |
 | Overlap | A badge sitting on top of a button | Absolute positioning looks fine at one width |
 | Contrast | Gray text you can barely read | Colors are chosen in code, never seen |
 | Dark-mode leaks | One white card in a dark page | A hard-coded `#fff` the theme can't reach |
@@ -83,6 +84,8 @@ Each language cell sets the browser locale and `Accept-Language`. Many apps pick
 A language whose page text comes out the same as the first one is reported as "not localized". That usually means the strategy is wrong.
 
 **No translations yet?** Add the pseudo-locale (from v0.5): `--locales en,pseudo`. That cell loads the first language and rewrites every visible string the way translations grow. "Subscribe" becomes `[Šûƀƀšççŕîîƀéé]`: accented, about 40% longer, and bracketed, so a missing `]` shows the end was cut. Text the app renders later is rewritten too. Code, form input and `translate="no"` content are left alone. The pseudo-locale finds layouts that break with longer text. It can't tell which strings are hard-coded, because it rewrites them all.
+
+**Right to left.** Arabic, Hebrew, Persian and Urdu pages start at the right edge and overflow to the left. Mantis checks them the same way, mirrored. It also reports an error when such a page is laid out left to right because `dir="rtl"` is missing. To see how an app without those languages would cope, use `--locales en,pseudo-rtl`: the pseudo-locale, laid out right to left (from v0.5).
 
 <p align="center">
   <img src="assets/proof.png" width="880" alt="Mantis fix receipt: the same 24 screens before and after the fixes, errors going from 14 to 0, with 0 cover-ups">

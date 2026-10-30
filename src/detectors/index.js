@@ -14,6 +14,7 @@ import brokenImage from './broken-image.js';
 import clippedText from './clipped-text.js';
 import consoleErrors from './console.js';
 import contrast from './contrast.js';
+import direction from './direction.js';
 import layoutShift from './layout-shift.js';
 import offStyle from './off-style.js';
 import overlap from './overlap.js';
@@ -26,6 +27,7 @@ export const CELL_DETECTORS = [
   layoutShift,
   pageOverflow,
   clippedText,
+  direction,
   overlap,
   contrast,
   tapTarget,
@@ -42,6 +44,7 @@ export const ISSUE_TYPES = [
   'cover-up',
   'page-overflow',
   'clipped-text',
+  'direction',
   'overlap',
   'contrast',
   'theme-leak',
