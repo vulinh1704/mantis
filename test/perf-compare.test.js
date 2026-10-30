@@ -136,9 +136,13 @@ describe('mantis perf: fixed at the root vs emptied (end-to-end)', { concurrency
     assert.equal(b.runId, runs.original.report.runId);
     assert.deepEqual(b.coverUps, []);
     assert.deepEqual(b.new, [], JSON.stringify(b.new));
-    assert.ok(b.fixed.length >= 8, JSON.stringify(b.fixed.map((f) => f.id)));
-    for (const cat of ['lcp-lazy', 'cls-source', 'api-chain', 'api-duplicate', 'third-party', 'unused-code']) {
-      assert.ok(b.fixed.some((f) => f.id.startsWith(`${cat}:`)), `${cat} fixed: ${JSON.stringify(b.fixed.map((f) => f.id))}`);
+    // Every finding of the original run is fixed. Which ones a run finds depends a little on the
+    // machine (on a slow runner the lazy hero can stay under the bar), so the list is the
+    // original's own, with the problems that always show up on top.
+    const original = runs.original.report.findings.map((f) => f.id).sort();
+    assert.deepEqual(b.fixed.map((f) => f.id).sort(), original);
+    for (const cat of ['cls-source', 'api-chain', 'api-duplicate', 'third-party', 'unused-code']) {
+      assert.ok(b.fixed.some((f) => f.id.startsWith(`${cat}:`)), `${cat} fixed: ${JSON.stringify(original)}`);
     }
     const d = b.routes[0].deltas;
     assert.ok(d.lcp.significant && d.lcp.better, JSON.stringify(d.lcp));
