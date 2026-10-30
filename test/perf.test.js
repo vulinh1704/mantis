@@ -471,7 +471,8 @@ describe('mantis perf on slow-app (end-to-end)', { concurrency: false }, () => {
     const m = route(mobile, '/');
     const d = route(desktop, '/');
     assert.equal(mobile.profile.name, 'mobile');
-    assert.ok(m.metrics.fcp.median > d.metrics.fcp.median * 2, `mobile FCP ${m.metrics.fcp.median} vs desktop ${d.metrics.fcp.median}`);
+    // Slow 4G adds 562 ms to every round trip; a ratio would depend on how fast the machine is.
+    assert.ok(m.metrics.fcp.median > d.metrics.fcp.median + 400, `mobile FCP ${m.metrics.fcp.median} vs desktop ${d.metrics.fcp.median}`);
     assert.ok(m.metrics.lcp.median > d.metrics.lcp.median + 1000, `mobile LCP ${m.metrics.lcp.median} vs desktop ${d.metrics.lcp.median}`);
     assert.ok(m.metrics.tbt.median > d.metrics.tbt.median, `mobile TBT ${m.metrics.tbt.median} vs desktop ${d.metrics.tbt.median}`);
     const e = m.visit.lcpElement;
