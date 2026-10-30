@@ -2,7 +2,8 @@
  * Draw issue markers into the live page right before the screenshot: a 2px outline around the
  * element (red for errors, amber for warnings) with a small numbered label. Everything lives in
  * one absolutely positioned layer appended to <html>, sized to the document and clipped to it,
- * so the overlay never changes the page's scroll size.
+ * so the overlay never changes the page's scroll size. On a right-to-left page the document
+ * extends left of x = 0 (overflow goes left), so the layer starts there and rects are shifted.
  *
  * @param {import('playwright').Page} page
  * @param {{n: number, severity: 'error'|'warn', rect: {x: number, y: number, width: number, height: number}}[]} items
@@ -15,11 +16,13 @@ export async function annotate(page, items) {
     const body = document.body;
     const W = Math.max(html.scrollWidth, body ? body.scrollWidth : 0);
     const H = Math.max(html.scrollHeight, body ? body.scrollHeight : 0);
+    const rtl = getComputedStyle(body || html).direction === 'rtl';
+    const left = rtl ? Math.min(0, html.clientWidth - W) : 0; // document x of the layer's left edge
     const root = document.createElement('div');
     root.setAttribute('data-mantis-overlay', '');
     root.setAttribute('data-mantis-overlay-root', '');
     root.setAttribute('aria-hidden', 'true');
-    root.style.cssText = `all:initial;position:absolute;left:0;top:0;width:${W}px;height:${H}px;overflow:hidden;pointer-events:none;z-index:2147483647;`;
+    root.style.cssText = `all:initial;position:absolute;left:${left}px;top:0;width:${W}px;height:${H}px;overflow:hidden;pointer-events:none;z-index:2147483647;`;
     const placed = [];
     // Larger boxes first so small ones (and their labels) end up on top.
     const sorted = items.slice().sort((a, b) => b.rect.width * b.rect.height - a.rect.width * a.rect.height);
@@ -27,6 +30,7 @@ export async function annotate(page, items) {
       const color = it.severity === 'error' ? '#ff2d55' : '#ffb020';
       const ink = it.severity === 'error' ? '#ffffff' : '#1d1d1f';
       let { x, y, width, height } = it.rect;
+      x -= left;
       if (width < 10) {
         x -= (10 - width) / 2;
         width = 10;

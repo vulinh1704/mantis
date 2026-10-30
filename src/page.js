@@ -102,34 +102,34 @@ export async function installPseudoLocale(context, { rtl = false } = {}) {
       A: 'Å', B: 'Ɓ', C: 'Ç', D: 'Ð', E: 'É', F: 'Ƒ', G: 'Ĝ', H: 'Ĥ', I: 'Î', J: 'Ĵ', K: 'Ķ', L: 'Ļ', M: 'Ṁ',
       N: 'Ñ', O: 'Ö', P: 'Þ', Q: 'Ǫ', R: 'Ŕ', S: 'Š', T: 'Ţ', U: 'Û', V: 'Ṽ', W: 'Ŵ', X: 'Ẋ', Y: 'Ý', Z: 'Ž',
     };
-    const SKIP = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEXTAREA', 'CODE', 'PRE', 'KBD', 'SAMP', 'TEMPLATE']);
+    // Not prose: code, scripts and styles (SVG <style> too: selectors match it case-insensitively),
+    // text the user types, and icon fonts whose glyphs are ligatures of their text ("menu").
+    const SKIP = 'script, style, noscript, textarea, code, pre, kbd, samp, template, ' +
+      '[contenteditable]:not([contenteditable="false"]), [class*="material-icons"], [class*="material-symbols"]';
+    const LETTER = /\p{L}/u;
     const done = new WeakMap(); // text node -> the string we wrote, so our own writes are not redone
     const pseudo = (s) => {
-      if (!/[A-Za-z]/.test(s)) return s;
+      if (!LETTER.test(s)) return s;
       const lead = s.match(/^\s*/)[0];
       const trail = s.match(/\s*$/)[0];
       const core = s.slice(lead.length, s.length - trail.length);
-      const letters = (core.match(/[A-Za-z]/g) || []).length;
+      const letters = [...core].filter((ch) => LETTER.test(ch)).length;
       const extra = Math.ceil(letters * 0.4);
       let out = '';
       let i = 0;
       for (const ch of core) {
         const c = MAP[ch] ?? ch;
         out += c;
-        if (/[A-Za-z]/.test(ch)) {
-          // Spread the extra letters evenly over the string.
+        if (LETTER.test(ch)) {
+          // Spread the extra letters evenly over the string (any script, not only Latin).
           if (Math.floor(((i + 1) * extra) / letters) > Math.floor((i * extra) / letters)) out += c;
           i++;
         }
       }
       return `${lead}[${out}]${trail}`;
     };
-    const skipped = (el) => {
-      for (let n = el; n; n = n.parentElement) {
-        if (SKIP.has(n.tagName) || n.getAttribute?.('translate') === 'no' || n.isContentEditable) return true;
-      }
-      return false;
-    };
+    // The nearest translate attribute decides, so translate="yes" inside translate="no" is rewritten.
+    const skipped = (el) => !!el.closest(SKIP) || el.closest('[translate]')?.getAttribute('translate') === 'no';
     const fixText = (t) => {
       if (done.get(t) === t.data || !t.parentElement || skipped(t.parentElement)) return;
       const next = pseudo(t.data);

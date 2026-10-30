@@ -162,7 +162,7 @@ async function runCell(browser, opts, cell, baseline, targets, session, log) {
   };
   try {
     for (const d of CELL_DETECTORS) if (d.setup) await d.setup(page, ctx);
-    if (opts.localeStrategy) await applyLocaleStrategy(context, cell.url, cell.browserLocale ?? cell.locale, opts.localeStrategy);
+    await applyLocaleStrategy(context, cell.url, cell.browserLocale, opts.localeStrategy);
     if (isPseudoLocale(cell.locale)) await installPseudoLocale(context, { rtl: cell.locale === 'pseudo-rtl' });
 
     let response;
@@ -184,16 +184,19 @@ async function runCell(browser, opts, cell, baseline, targets, session, log) {
       await applyDarkStrategy(page, opts.darkStrategy, cell.scheme);
       info.title = await page.title().catch(() => null);
 
-      // Untranslated locale cells: compare the visible text with the first locale's cell.
-      const textHash = sha1(await pageText(page));
-      if (cell.localeIndex === 0) {
-        baseline.resolve(textHash);
-      } else {
-        const base = await baseline.promise;
-        if (base && base === textHash) {
-          info.status = 'not-localized';
-          await finishAnimations(page);
-          return out;
+      // Untranslated locale cells: compare the visible text with the reference cell (the first real
+      // locale). Pseudo-locale cells differ from it on purpose and are always checked.
+      if (!isPseudoLocale(cell.locale)) {
+        const textHash = sha1(await pageText(page));
+        if (cell.reference) {
+          baseline.resolve(textHash);
+        } else {
+          const base = await baseline.promise;
+          if (base && base === textHash) {
+            info.status = 'not-localized';
+            await finishAnimations(page);
+            return out;
+          }
         }
       }
 
@@ -245,7 +248,7 @@ async function runCell(browser, opts, cell, baseline, targets, session, log) {
       return out;
     }
   } finally {
-    if (cell.localeIndex === 0) baseline.resolve(null);
+    if (cell.reference) baseline.resolve(null);
   }
 }
 
@@ -256,6 +259,9 @@ async function runCell(browser, opts, cell, baseline, targets, session, log) {
  * @returns {Promise<{report: object, runDir: string, latestDir: string, exitCode: number}>}
  */
 export async function look(opts, { log = () => {} } = {}) {
+  opts = { ...opts, localeStrategy: opts.localeStrategy ?? { kind: 'browser' } };
+  // Untranslated locales are compared with the first real one; pseudo-locales never are.
+  const referenceLocale = opts.locales.find((l) => !isPseudoLocale(l)) ?? null;
   const startedAt = new Date();
   const session = opts.storageState ? await readStorageState(opts.storageState) : null;
   const base = await findBaseline(opts);
@@ -317,16 +323,18 @@ export async function look(opts, { log = () => {} } = {}) {
     await pool(groups, opts.concurrency, async (g, gi) => {
       let results = [];
       try {
+        const browserLocale = baseLocale(g.locale, opts.locales);
         results = await Promise.all(opts.schemes.map((scheme) => {
           const cell = {
             id: `${slugs.get(g.route)}__${g.viewport.name}__${scheme}__${g.locale}`,
             route: g.route,
-            url: localeUrl(opts.baseUrl, g.route, baseLocale(g.locale, opts.locales), opts.localeStrategy ?? { kind: 'browser' }),
+            url: localeUrl(opts.baseUrl, g.route, browserLocale, opts.localeStrategy),
             viewport: g.viewport,
             scheme,
             locale: g.locale,
-            browserLocale: baseLocale(g.locale, opts.locales),
+            browserLocale,
             localeIndex: g.localeIndex,
+            reference: g.locale === referenceLocale,
           };
           const targets = base ? baselineTargets(base, g.route, `${g.viewport.name}/${scheme}/${g.locale}`) : [];
           return runCell(browser, { ...opts, styleData }, cell, baselines.get(`${g.route}|${g.viewport.name}|${scheme}`), targets, session, log);
@@ -431,14 +439,14 @@ export async function look(opts, { log = () => {} } = {}) {
 
     const notes = [];
     for (const route of opts.routes) {
-      for (const locale of opts.locales.slice(1)) {
+      for (const locale of opts.locales.filter((l) => l !== referenceLocale && !isPseudoLocale(l))) {
         const nl = cells.filter((c) => c.route === route && c.locale === locale && c.status === 'not-localized');
         if (nl.length) {
           const all = cells.filter((c) => c.route === route && c.locale === locale).length;
-          const hint = (opts.localeStrategy?.kind ?? 'browser') === 'browser'
+          const hint = opts.localeStrategy.kind === 'browser'
             ? ' If the app picks its language from the URL, a cookie or localStorage, pass --locale-strategy.'
             : '';
-          notes.push(`\`${route}\` · ${locale}: not localized — page text is identical to ${opts.locales[0]} in ${nl.length === all ? 'every cell' : `${nl.length} of ${all} cells`}; detectors were not re-run there.${hint}`);
+          notes.push(`\`${route}\` · ${locale}: not localized — page text is identical to ${referenceLocale} in ${nl.length === all ? 'every cell' : `${nl.length} of ${all} cells`}; detectors were not re-run there.${hint}`);
         }
       }
       const ne = noEffect.get(route);
@@ -463,7 +471,7 @@ export async function look(opts, { log = () => {} } = {}) {
       options: {
         ...opts,
         darkStrategyText: formatDarkStrategy(opts.darkStrategy),
-        localeStrategyText: formatLocaleStrategy(opts.localeStrategy ?? { kind: 'browser' }),
+        localeStrategyText: formatLocaleStrategy(opts.localeStrategy),
       },
       cells,
       issues: registry.issues,
