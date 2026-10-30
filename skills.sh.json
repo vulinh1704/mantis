@@ -11,6 +11,11 @@
       "title": "Fix and prove",
       "description": "Fix at the root, catch fixes that only hide a bug, and show before/after proof.",
       "skills": ["mantis-fix", "mantis-proof"]
+    },
+    {
+      "title": "Measure speed",
+      "description": "Measure load speed like a phone, fix what slows the page down by impact and risk, and catch speed-ups that only remove content.",
+      "skills": ["mantis-perf"]
     }
   ]
 }
