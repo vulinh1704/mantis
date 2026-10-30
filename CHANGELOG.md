@@ -2,7 +2,7 @@
 
 Full notes, with images, are on the [releases page](https://github.com/vulinh1704/mantis/releases).
 
-## Unreleased
+## 0.7.1 (2026-10-30)
 
 - The GitHub Action's description is 123 characters, so it can be listed on GitHub Marketplace, which refuses more than 125. A test checks the limit.
 - `mantis perf`: Chrome now and then reports no LCP entry for an image it did paint. This happened in 1 of 5 desktop visits on a CI runner and 1 in 10 under load locally, and the LCP fell back to a heading. Mantis now flags such a visit: an image on screen that loaded after the last candidate and is much larger. Images Chrome leaves out on purpose are skipped: placeholders, full-viewport backgrounds, transparent images.
