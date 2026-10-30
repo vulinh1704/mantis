@@ -302,6 +302,10 @@ function collectInPage() {
     lcpElement,
     shifts: P.shifts.map((s) => ({ t: Math.round(s.t), value: s.value, sources: s.nodes.map(sel).filter(Boolean).slice(0, 4), cause: causeOf(s) })),
     fonts: document.fonts ? [...document.fonts].map((f) => ({ family: f.family.replace(/^["']|["']$/g, ''), display: f.display, status: f.status })) : [],
+    iframes: [...document.querySelectorAll('iframe[src]')].slice(0, 30).map((f) => {
+      const r = f.getBoundingClientRect();
+      return { selector: sel(f), src: f.src, loading: f.getAttribute('loading'), inViewport: r.bottom > 0 && r.top < vh && r.width > 0 && r.height > 0 };
+    }),
     longtasks: P.longtasks.map((t) => ({ t: Math.round(t.t), duration: Math.round(t.duration) })),
     loafs: P.loafs.filter((f) => f.blocking > 0 || f.duration > 50).map((f) => ({ ...f, t: Math.round(f.t), duration: Math.round(f.duration), blocking: Math.round(f.blocking) })),
     images,
@@ -429,7 +433,7 @@ export async function measureTrace(browser, url, profile, { storageState = null,
       const used = e.ranges.reduce((s, r) => s + (r.end - r.start), 0);
       coverage.push({ url: e.url, type: 'css', total: e.text.length, unused: Math.max(0, e.text.length - used) });
     }
-    return { requests: requests(), coverage, hotFunctions: hotFunctions(cpu) };
+    return { requests: requests(), coverage, hotFunctions: hotFunctions(cpu), scriptTime: scriptTime(cpu) };
   } finally {
     await context.close();
   }
@@ -456,6 +460,18 @@ export function hotFunctions(cpu, { min = 10 } = {}) {
     merged.set(key, m);
   }
   return [...merged.values()].map((m) => ({ ...m, self: Math.round(m.self) })).filter((m) => m.self >= min).sort((a, b) => b.self - a.self).slice(0, 15);
+}
+
+/** Main-thread self time per script URL, every function counted: what each script costs in all. */
+export function scriptTime(cpu) {
+  if (!cpu?.nodes) return [];
+  const urlOf = new Map(cpu.nodes.map((n) => [n.id, n.callFrame?.url || '']));
+  const byUrl = new Map();
+  cpu.samples.forEach((id, i) => {
+    const url = urlOf.get(id);
+    if (url) byUrl.set(url, (byUrl.get(url) || 0) + (cpu.timeDeltas[i] || 0) / 1000);
+  });
+  return [...byUrl].map(([url, ms]) => ({ url, self: Math.round(ms) })).filter((s) => s.self > 0).sort((a, b) => b.self - a.self);
 }
 
 /**

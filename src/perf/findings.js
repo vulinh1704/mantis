@@ -9,6 +9,7 @@
  */
 import { clsOf } from './measure.js';
 import { fmtKb, fmtMs, rating, shortUrl, siteOf } from './metrics.js';
+import { networkChecks } from './network.js';
 
 export const BUCKETS = Object.freeze([
   { id: 'do-first', title: 'Do first', blurb: 'worth it, low risk' },
@@ -20,8 +21,11 @@ export const BUCKETS = Object.freeze([
 const RISK_POINTS = { low: 1, medium: 2, high: 3 };
 const CONFIDENCE = { measured: 1, estimated: 0.8, heuristic: 0.5 };
 
-/** Savings that make a finding medium or high impact: [medium, high]. */
-const STEPS = { lcp: [250, 800], fcp: [250, 800], tbt: [100, 250], cls: [0.03, 0.1], bytes: [100, 500] };
+/**
+ * Savings that make a finding medium or high impact: [medium, high]. `data` is when the page's API
+ * calls are all answered, which has no Core Web Vitals threshold.
+ */
+const STEPS = { lcp: [250, 800], fcp: [250, 800], tbt: [100, 250], cls: [0.03, 0.1], data: [250, 800], bytes: [100, 500] };
 
 /** The saving that counts for a metric: ms for timings, the shift score for CLS, KB for bytes. */
 const savingFor = (metric, s) => (metric === 'cls' ? s.cls : metric === 'bytes' ? s.kb : s.ms) ?? 0;
@@ -56,7 +60,7 @@ export function savingLabel(f) {
   const m = f.metric;
   if (m === 'bytes') return `−${fmtKb(Math.round(f.savings.kb * 1024))}`;
   if (m === 'cls') return f.savings.cls > 0 ? `CLS −${f.savings.cls}` : `shift ${f.savings.shift}`;
-  return `${m.toUpperCase()} −${fmtMs(f.savings.ms)}`;
+  return `${m === 'data' ? 'data' : m.toUpperCase()} −${fmtMs(f.savings.ms)}`;
 }
 
 /** The framework's own way to apply a fix, by category. */
@@ -195,10 +199,11 @@ export function findRouteIssues(r, profile) {
     });
   }
 
-  // Scripts and stylesheets that hold the first paint. They download side by side, so they are one
-  // finding: the first paint can only move up once none of them blocks it.
+  // The app's scripts and stylesheets that hold the first paint (a vendor's are part of its finding).
+  // They download side by side, so they are one finding: the first paint can only move up once none
+  // of them blocks it.
   const fcp = v.fcp;
-  const blocking = v.requests.filter((q) => q.renderBlocking && q.end != null && fcp != null && q.start < fcp && (q.type === 'Script' || q.type === 'Stylesheet'));
+  const blocking = v.requests.filter((q) => q.renderBlocking && q.end != null && fcp != null && q.start < fcp && firstParty(q.url) && (q.type === 'Script' || q.type === 'Stylesheet'));
   const held = blocking.length ? Math.round(Math.max(0, Math.min(Math.max(...blocking.map((q) => q.end)), fcp) - docEnd)) : 0;
   if (held >= 50) {
     const scripts = blocking.filter((q) => q.type === 'Script');
@@ -342,6 +347,8 @@ export function findRouteIssues(r, profile) {
       });
     }
   }
+
+  networkChecks(r, profile, add);
   return out;
 }
 

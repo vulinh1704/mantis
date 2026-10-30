@@ -11,10 +11,11 @@ import { VERSION, ensureOutDir, firstLine, runIdFor, uniqueDir } from '../util.j
 import { BUCKETS, findRouteIssues, rankFindings, savingLabel } from './findings.js';
 import { PERF_PROFILES, measureTrace, measureVisit } from './measure.js';
 import { fmtKb, fmtMs, median, rating, shortUrl } from './metrics.js';
+import { dataReady } from './network.js';
 
 export { THRESHOLDS, fmtKb, fmtMs, median, rating, shortUrl } from './metrics.js';
 
-const METRICS = ['lcp', 'fcp', 'tbt', 'cls', 'ttfb', 'load', 'bytes', 'requests'];
+const METRICS = ['lcp', 'fcp', 'tbt', 'cls', 'ttfb', 'data', 'load', 'bytes', 'requests'];
 
 /** Medians, ranges and ratings over the measured visits of one route. */
 export function aggregate(visits) {
@@ -73,6 +74,7 @@ export async function perf(opts, { log = () => {} } = {}) {
       for (let i = 0; i < opts.runs; i++) {
         try {
           const v = await measureVisit(browser, url, profile, { storageState: session, timeout: opts.timeout });
+          v.metrics.data = dataReady(v.requests, url);
           visits.push(v);
           log(`[${route} ${i + 1}/${opts.runs}] LCP ${fmtMs(v.metrics.lcp)} · TBT ${fmtMs(v.metrics.tbt)} · CLS ${v.metrics.cls} · ${fmtKb(v.metrics.bytes)}`);
         } catch (err) {
@@ -80,7 +82,7 @@ export async function perf(opts, { log = () => {} } = {}) {
           log(`[${route} ${i + 1}/${opts.runs}] failed: ${firstLine(err.message)}`);
         }
       }
-      let trace = { requests: [], coverage: [], hotFunctions: [] };
+      let trace = { requests: [], coverage: [], hotFunctions: [], scriptTime: [] };
       try {
         trace = await measureTrace(browser, url, profile, { storageState: session, timeout: opts.timeout });
       } catch (err) {
@@ -100,7 +102,7 @@ export async function perf(opts, { log = () => {} } = {}) {
         metrics,
         framework: rep.framework,
         devServer: rep.devSigns.length > 0,
-        visit: { ...rep, requests: attachServerWait(rep.requests, trace.requests), coverage: trace.coverage, hotFunctions: trace.hotFunctions },
+        visit: { ...rep, requests: attachServerWait(rep.requests, trace.requests), coverage: trace.coverage, hotFunctions: trace.hotFunctions, scriptTime: trace.scriptTime },
         notes,
       });
     }
@@ -140,7 +142,7 @@ export async function perf(opts, { log = () => {} } = {}) {
 
 const RATING = { good: 'good', 'needs-improvement': 'needs improvement', poor: '**poor**' };
 const FRAMEWORK_NAME = { next: 'Next.js', nuxt: 'Nuxt', sveltekit: 'SvelteKit', angular: 'Angular', vue: 'Vue', react: 'React' };
-const LABEL = { lcp: 'LCP', fcp: 'FCP', tbt: 'TBT', cls: 'CLS', ttfb: 'TTFB', load: 'load', bytes: 'transferred', requests: 'requests' };
+const LABEL = { lcp: 'LCP', fcp: 'FCP', tbt: 'TBT', cls: 'CLS', ttfb: 'TTFB', data: 'API data in', load: 'load', bytes: 'transferred', requests: 'requests' };
 const fmt = (m, v) => (m === 'cls' ? String(v) : m === 'bytes' ? fmtKb(v) : m === 'requests' ? String(v) : fmtMs(v));
 
 /** @param {object} report */
@@ -160,7 +162,14 @@ export function renderPerfMarkdown(report) {
       lines.push(`### ${b.title} (${b.blurb})`, '');
       for (const f of group) {
         const c = f.culprit;
-        const where = [c.selector && `\`${c.selector}\``, c.fn && `\`${c.fn}\``, c.url && `${shortUrl(c.url, origin)}${c.line ? `:${c.line}` : ''}`, c.from && `(loaded from ${c.from})`].filter(Boolean).join(' · ');
+        const where = [
+          c.selector && `\`${c.selector}\``,
+          c.fn && `\`${c.fn}\``,
+          c.url && `${shortUrl(c.url, origin)}${c.line ? `:${c.line}` : ''}`,
+          c.from && `(loaded from ${shortUrl(c.from, origin)})`,
+          c.calledFrom && `(called from ${shortUrl(c.calledFrom, origin)})`,
+          c.waitedFor && `(waited for ${shortUrl(c.waitedFor, origin)})`,
+        ].filter(Boolean).join(' · ');
         lines.push(`${++n}. **${f.title}** · ${savingLabel(f)} (${f.confidence}) · impact ${f.impact} · fix risk ${f.fixRisk} · ${f.routes.map((r) => `\`${r}\``).join(', ')}`);
         if (where) lines.push(`   - Where: ${where}`);
         lines.push(`   - Why: ${f.evidence}`);
