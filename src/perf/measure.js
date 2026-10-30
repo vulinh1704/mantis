@@ -40,8 +40,20 @@ export const PERF_PROFILES = Object.freeze({
 
 /** Runs in the page before any of its scripts: keeps every performance entry Mantis needs. */
 function perfInitScript() {
-  const P = { lcp: [], shifts: [], longtasks: [], loafs: [], fcp: null, lcpElement: null };
+  const P = { lcp: [], shifts: [], longtasks: [], loafs: [], fcp: null, lcpElement: null, added: [], loaded: [], fontsDone: [] };
   window.__mantisPerf = P;
+  // What could have caused a layout shift: elements inserted after parsing, images and fonts arriving.
+  let parsed = false;
+  document.addEventListener('DOMContentLoaded', () => (parsed = true));
+  new MutationObserver((records) => {
+    if (!parsed) return;
+    const t = performance.now();
+    for (const r of records) for (const n of r.addedNodes) if (n.nodeType === 1 && P.added.length < 1000) P.added.push({ t, node: n });
+  }).observe(document, { childList: true, subtree: true });
+  document.addEventListener('load', (e) => {
+    if (e.target.localName === 'img' && P.loaded.length < 500) P.loaded.push({ t: performance.now(), node: e.target });
+  }, true);
+  document.fonts?.addEventListener?.('loadingdone', () => P.fontsDone.push(performance.now()));
   const observe = (type, fn) => {
     try {
       new PerformanceObserver((list) => list.getEntries().forEach(fn)).observe({ type, buffered: true });
@@ -193,18 +205,63 @@ function collectInPage() {
   if (lcpEl) {
     const r = lcpEl.getBoundingClientRect();
     const isImg = lcpEl.localName === 'img';
+    const url = lastLcp?.url || null;
     lcpElement = {
       selector: sel(lcpEl),
       tag: lcpEl.localName,
       text: isImg ? '' : (lcpEl.innerText || lcpEl.textContent || '').trim().slice(0, 80),
-      url: lastLcp?.url || null,
+      url,
+      // the attribute as written, to check whether the server's HTML has it (or JS put it there)
+      srcAttr: isImg ? lcpEl.getAttribute('src') || '' : null,
       loading: lcpEl.getAttribute?.('loading') || null,
       fetchpriority: lcpEl.getAttribute?.('fetchpriority') || null,
+      preloaded: !!url && [...document.querySelectorAll('link[rel="preload"][as="image"]')].some((l) => l.href === url),
       rect: { width: Math.round(r.width), height: Math.round(r.height) },
       natural: isImg ? { width: lcpEl.naturalWidth, height: lcpEl.naturalHeight } : null,
-      inHtml: isImg ? !!document.querySelector(`img[src="${CSS.escape(lcpEl.getAttribute('src') || '')}"]`) : null,
     };
   }
+  // The likeliest cause of each layout shift, above the elements that moved: the latest element
+  // inserted (or container filled) or image loaded in the second before it; else an image with no
+  // size above them (on a slow network its size is known, and the page jumps, long before it has
+  // loaded); else a web font that just swapped in.
+  const unsized = (img) => !(img.hasAttribute('width') && img.hasAttribute('height')) && getComputedStyle(img).aspectRatio === 'auto';
+  const addedAt = new Map();
+  for (const a of P.added) {
+    const k = `${a.t}`;
+    if (!addedAt.has(k)) addedAt.set(k, new Map());
+    const byParent = addedAt.get(k);
+    byParent.set(a.node.parentNode, (byParent.get(a.node.parentNode) || 0) + 1);
+  }
+  const causeOf = (s) => {
+    const tops = s.nodes.filter((n) => n.isConnected).map((n) => n.getBoundingClientRect().top);
+    const top = tops.length ? Math.min(...tops) : Infinity;
+    const above = (node) => node.getBoundingClientRect().top <= top + 1;
+    const near = (t) => t >= s.t - 1000 && t <= s.t + 20;
+    let best = null;
+    const consider = (c) => {
+      if (near(c.t) && (!best || c.t > best.t)) best = c;
+    };
+    for (const a of P.added) {
+      if (!a.node.isConnected || !above(a.node)) continue;
+      const parent = a.node.parentElement;
+      const siblings = addedAt.get(`${a.t}`)?.get(a.node.parentNode) || 0;
+      if (siblings > 1 && parent) consider({ t: a.t, kind: 'filled', node: parent });
+      else consider({ t: a.t, kind: 'inserted', node: a.node });
+    }
+    for (const l of P.loaded) {
+      if (l.node.isConnected && above(l.node)) consider({ t: l.t, kind: unsized(l.node) ? 'unsized-image' : 'image', node: l.node });
+    }
+    if (!best) {
+      let img = null;
+      for (const i of document.images) {
+        const r = i.getBoundingClientRect();
+        if (unsized(i) && r.height > 0 && r.bottom <= top + 1 && (!img || r.bottom > img.getBoundingClientRect().bottom)) img = i;
+      }
+      if (img) best = { t: null, kind: 'unsized-image', node: img };
+    }
+    if (!best) for (const t of P.fontsDone) consider({ t, kind: 'font', node: null });
+    return best ? { kind: best.kind, selector: best.node ? sel(best.node) : null, t: best.t == null ? null : Math.round(best.t) } : null;
+  };
   const vh = innerHeight;
   const images = [...document.images].slice(0, 200).map((img) => {
     const r = img.getBoundingClientRect();
@@ -243,7 +300,8 @@ function collectInPage() {
     fcp: P.fcp != null ? Math.round(P.fcp) : null,
     lcp: lastLcp ? Math.round(lastLcp.t) : null,
     lcpElement,
-    shifts: P.shifts.map((s) => ({ t: Math.round(s.t), value: s.value, sources: s.nodes.map(sel).filter(Boolean).slice(0, 4) })),
+    shifts: P.shifts.map((s) => ({ t: Math.round(s.t), value: s.value, sources: s.nodes.map(sel).filter(Boolean).slice(0, 4), cause: causeOf(s) })),
+    fonts: document.fonts ? [...document.fonts].map((f) => ({ family: f.family.replace(/^["']|["']$/g, ''), display: f.display, status: f.status })) : [],
     longtasks: P.longtasks.map((t) => ({ t: Math.round(t.t), duration: Math.round(t.duration) })),
     loafs: P.loafs.filter((f) => f.blocking > 0 || f.duration > 50).map((f) => ({ ...f, t: Math.round(f.t), duration: Math.round(f.duration), blocking: Math.round(f.blocking) })),
     images,
@@ -298,6 +356,11 @@ export async function measureVisit(browser, url, profile, { storageState = null,
     const reqs = requests();
     const blocking = new Set(data.renderBlocking);
     for (const r of reqs) r.renderBlocking = blocking.has(r.url);
+    if (data.lcpElement?.srcAttr) {
+      // In the HTML the server sent, the preload scanner finds the image early; put there by JS, it waits for the script.
+      const html = await response?.text().catch(() => '') ?? '';
+      data.lcpElement.inHtml = html.includes(data.lcpElement.srcAttr);
+    }
     return {
       status: response ? response.status() : null,
       metrics: {

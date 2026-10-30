@@ -1,5 +1,5 @@
 {
-  "$comment": "Every performance problem planted in slow-app (served by test/helpers/slow-server.js, which adds the API delays, the hero image, the bundle and the vendor origin), with what mantis perf must measure to explain it. test/perf.test.js checks the evidence; the findings that turn it into ranked fixes are checked against this file as they land.",
+  "$comment": "Every performance problem planted in slow-app (served by test/helpers/slow-server.js, which adds the API delays, the hero image, the bundle and the vendor origin), with what mantis perf must measure to explain it. test/perf.test.js checks the evidence, and `finding` is what mantis perf --profile mobile must report: the category, the bucket where it is stable, and regexes on the culprit and the fix. Problems without one are covered by the API and third-party findings.",
   "routes": {
     "/": "the orders page, with every problem below",
     "/fast": "the same app's help page: one request, nothing to fix",
@@ -11,35 +11,40 @@
       "title": "The hero image is the LCP element and is lazy-loaded",
       "where": "index.html <img class=\"hero\" loading=\"lazy\">",
       "fix": "drop loading=\"lazy\", add fetchpriority=\"high\" (or preload it)",
-      "evidence": "lcpElement.loading = lazy"
+      "evidence": "lcpElement.loading = lazy",
+      "finding": { "category": "lcp-lazy", "bucket": "do-first", "culprit": { "selector": "hero" } }
     },
     {
       "id": "oversized-image",
       "title": "The hero is 1200 px wide and drawn about 412 px wide on a phone",
       "where": "/hero.png",
       "fix": "srcset/sizes with smaller widths, and a modern format",
-      "evidence": "lcpElement.natural.width >= 2 × lcpElement.rect.width (mobile)"
+      "evidence": "lcpElement.natural.width >= 2 × lcpElement.rect.width (mobile)",
+      "finding": { "category": "image-oversized", "bucket": "do-first", "culprit": { "url": "/hero\\.png$" }, "fix": "AVIF or WebP" }
     },
     {
       "id": "unsized-image",
       "title": "The hero has no width and height, so the page jumps when it arrives",
       "where": "index.html <img class=\"hero\">",
       "fix": "width/height attributes or aspect-ratio",
-      "evidence": "layout shifts after the image loads"
+      "evidence": "layout shifts after the image loads",
+      "finding": { "category": "cls-source", "bucket": "do-first", "culprit": { "selector": "^img\\.hero$" }, "fix": "width` and `height" }
     },
     {
       "id": "late-banner",
       "title": "A promo banner is inserted above everything once the user is known",
       "where": "app.js showGreeting()",
       "fix": "reserve its space, or render it with the page",
-      "evidence": "CLS > 0.1"
+      "evidence": "CLS > 0.1",
+      "finding": { "category": "cls-source", "culprit": { "selector": "promo" } }
     },
     {
       "id": "render-blocking-script",
       "title": "A synchronous script in <head> holds the first paint for its 300 ms",
       "where": "index.html <script src=\"/flags.js\">",
       "fix": "defer it, or inline the flags",
-      "evidence": "flags.js renderBlocking = true"
+      "evidence": "flags.js renderBlocking = true",
+      "finding": { "category": "render-blocking", "bucket": "plan", "fix": "/flags\\.js: inline it" }
     },
     {
       "id": "request-chain",
@@ -74,14 +79,16 @@
       "title": "renderAllPoints() rescales the chart for every point: quadratic main-thread work",
       "where": "app.js renderAllPoints()",
       "fix": "compute the scale once (linear), or move it to a worker",
-      "evidence": "hotFunctions has renderAllPoints; a long animation frame after the data arrives"
+      "evidence": "hotFunctions has renderAllPoints; a long animation frame after the data arrives",
+      "finding": { "category": "long-task", "bucket": "plan", "culprit": { "fn": "^renderAllPoints$", "url": "/app\\.js$" } }
     },
     {
       "id": "unused-bundle",
       "title": "big.js ships 1500 features and the page calls one",
       "where": "/big.js",
       "fix": "split it and import what the route uses",
-      "evidence": "coverage: more than 90% of big.js never runs"
+      "evidence": "coverage: more than 90% of big.js never runs",
+      "finding": { "category": "unused-code", "culprit": { "url": "/big\\.js$" } }
     },
     {
       "id": "third-party-widget",

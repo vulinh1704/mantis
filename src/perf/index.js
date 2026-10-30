@@ -8,29 +8,11 @@ import path from 'node:path';
 import { launchBrowser, preflight } from '../look.js';
 import { readStorageState } from '../options.js';
 import { VERSION, ensureOutDir, firstLine, runIdFor, uniqueDir } from '../util.js';
+import { BUCKETS, findRouteIssues, rankFindings, savingLabel } from './findings.js';
 import { PERF_PROFILES, measureTrace, measureVisit } from './measure.js';
+import { fmtKb, fmtMs, median, rating, shortUrl } from './metrics.js';
 
-/** Core Web Vitals and Lighthouse thresholds: [good up to, poor above]. */
-export const THRESHOLDS = Object.freeze({
-  lcp: [2500, 4000],
-  fcp: [1800, 3000],
-  cls: [0.1, 0.25],
-  tbt: [200, 600],
-  ttfb: [800, 1800],
-});
-
-export function rating(metric, value) {
-  const t = THRESHOLDS[metric];
-  if (!t || value == null) return null;
-  return value <= t[0] ? 'good' : value <= t[1] ? 'needs-improvement' : 'poor';
-}
-
-export function median(values) {
-  const v = values.filter((x) => x != null).sort((a, b) => a - b);
-  if (!v.length) return null;
-  const m = Math.floor(v.length / 2);
-  return v.length % 2 ? v[m] : Math.round(((v[m - 1] + v[m]) / 2) * 1000) / 1000;
-}
+export { THRESHOLDS, fmtKb, fmtMs, median, rating, shortUrl } from './metrics.js';
 
 const METRICS = ['lcp', 'fcp', 'tbt', 'cls', 'ttfb', 'load', 'bytes', 'requests'];
 
@@ -122,6 +104,8 @@ export async function perf(opts, { log = () => {} } = {}) {
         notes,
       });
     }
+    const findings = rankFindings(routes.filter((r) => r.status === 'ok').map((r) => findRouteIssues(r, profile)));
+    const counts = Object.fromEntries(BUCKETS.map((b) => [b.id, findings.filter((f) => f.bucket === b.id).length]));
     const report = {
       tool: 'mantis',
       kind: 'perf',
@@ -133,6 +117,8 @@ export async function perf(opts, { log = () => {} } = {}) {
       durationMs: Date.now() - startedAt.getTime(),
       profile: { name: profile.name, label: profile.label },
       runs: opts.runs,
+      summary: { findings: findings.length, ...counts },
+      findings,
       routes,
     };
     const outDir = path.resolve(opts.out);
@@ -146,34 +132,47 @@ export async function perf(opts, { log = () => {} } = {}) {
     await mkdir(path.dirname(latestDir), { recursive: true });
     await cp(runDir, latestDir, { recursive: true });
     const failed = routes.some((r) => r.status === 'failed');
-    return { report, runDir, latestDir, exitCode: failed ? 2 : 0 };
+    return { report, runDir, latestDir, exitCode: failed ? 2 : counts['do-first'] + counts.plan > 0 ? 1 : 0 };
   } finally {
     await browser.close().catch(() => {});
   }
 }
 
-export const fmtMs = (ms) => (ms == null ? '–' : ms >= 1000 ? `${(ms / 1000).toFixed(1)} s` : `${Math.round(ms)} ms`);
-export const fmtKb = (b) => (b == null ? '–' : b >= 1024 * 1024 ? `${(b / 1024 / 1024).toFixed(1)} MB` : b >= 1024 ? `${Math.round(b / 1024)} KB` : `${b} B`);
 const RATING = { good: 'good', 'needs-improvement': 'needs improvement', poor: '**poor**' };
+const FRAMEWORK_NAME = { next: 'Next.js', nuxt: 'Nuxt', sveltekit: 'SvelteKit', angular: 'Angular', vue: 'Vue', react: 'React' };
 const LABEL = { lcp: 'LCP', fcp: 'FCP', tbt: 'TBT', cls: 'CLS', ttfb: 'TTFB', load: 'load', bytes: 'transferred', requests: 'requests' };
 const fmt = (m, v) => (m === 'cls' ? String(v) : m === 'bytes' ? fmtKb(v) : m === 'requests' ? String(v) : fmtMs(v));
-
-/** Shorten a URL to its path when it is on the page's origin. */
-export function shortUrl(url, origin) {
-  try {
-    const u = new URL(url);
-    const s = u.origin === origin ? u.pathname + u.search : `${u.host}${u.pathname}`;
-    return s.length > 70 ? `${s.slice(0, 67)}…` : s;
-  } catch {
-    return url;
-  }
-}
 
 /** @param {object} report */
 export function renderPerfMarkdown(report) {
   const lines = ['# Mantis perf report', ''];
   lines.push(`\`${report.url}\` · ${report.profile.label} · median of ${report.runs} cold visit${report.runs === 1 ? '' : 's'} per route · ${(report.durationMs / 1000).toFixed(0)}s`, '');
   lines.push('INP needs real interactions, which a lab run does not have: TBT and the long animation frames below stand in for responsiveness.', '');
+  const findings = report.findings ?? [];
+  if (findings.length) {
+    lines.push('## Fixes, ranked', '');
+    lines.push('Savings are estimates for this profile: measure again after each fix.', '');
+    const origin = new URL(report.url).origin;
+    let n = 0;
+    for (const b of BUCKETS) {
+      const group = findings.filter((f) => f.bucket === b.id);
+      if (!group.length) continue;
+      lines.push(`### ${b.title} (${b.blurb})`, '');
+      for (const f of group) {
+        const c = f.culprit;
+        const where = [c.selector && `\`${c.selector}\``, c.fn && `\`${c.fn}\``, c.url && `${shortUrl(c.url, origin)}${c.line ? `:${c.line}` : ''}`, c.from && `(loaded from ${c.from})`].filter(Boolean).join(' · ');
+        lines.push(`${++n}. **${f.title}** · ${savingLabel(f)} (${f.confidence}) · impact ${f.impact} · fix risk ${f.fixRisk} · ${f.routes.map((r) => `\`${r}\``).join(', ')}`);
+        if (where) lines.push(`   - Where: ${where}`);
+        lines.push(`   - Why: ${f.evidence}`);
+        lines.push(`   - Fix: ${f.fix}`);
+        if (f.frameworkFix) lines.push(`   - ${FRAMEWORK_NAME[f.frameworkFix.framework] ?? f.frameworkFix.framework}: ${f.frameworkFix.text}`);
+        lines.push(`   - Risk: ${f.riskReason}`);
+      }
+      lines.push('');
+    }
+  } else if (report.routes.some((r) => r.metrics)) {
+    lines.push('No fixes to suggest: nothing measured here stands out.', '');
+  }
   for (const r of report.routes) {
     lines.push(`## \`${r.route}\``, '');
     for (const n of r.notes ?? []) lines.push(`> ${n}`, '');
