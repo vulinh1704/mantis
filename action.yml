@@ -1,5 +1,5 @@
 name: Mantis UI and speed check
-description: Check a preview deployment in a real browser on every screen, theme and language, or measure its speed, compare it with a baseline, and comment on the pull request.
+description: Check a pull request preview in a real browser on every screen, theme and language, or its speed, and comment what changed.
 author: vulinh1704
 branding:
   icon: eye
