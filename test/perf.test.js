@@ -440,7 +440,9 @@ describe('mantis perf on slow-app (end-to-end)', { concurrency: false }, () => {
   before(async () => {
     tmp = await mkdtemp(path.join(os.tmpdir(), 'mantis-perf-'));
     server = await startSlowServer();
-    let res = await runCli(['perf', `${server.url}/`, '--routes', '/,/fast,/dev', '--runs', '2', '--profile', 'desktop', '--out', path.join(tmp, 'd')]);
+    // 3 visits: under load Chrome now and then reports no LCP entry for an image it has painted
+    // (seen 1 time in 20), and the median of 3 is the honest visit, where 2 could pick the odd one.
+    let res = await runCli(['perf', `${server.url}/`, '--routes', '/,/fast,/dev', '--runs', '3', '--profile', 'desktop', '--out', path.join(tmp, 'd')]);
     assert.equal(res.code, 1, res.stderr);
     assert.match(res.stdout, /report {2}.*perf\.md/);
     desktop = JSON.parse(readFileSync(path.join(tmp, 'd', 'perf', 'latest', 'perf.json'), 'utf8'));
@@ -459,7 +461,7 @@ describe('mantis perf on slow-app (end-to-end)', { concurrency: false }, () => {
 
   test('every metric is the median of the runs, with its spread', () => {
     const m = route(desktop, '/').metrics;
-    for (const k of ['lcp', 'fcp', 'tbt', 'cls', 'ttfb', 'bytes', 'requests']) assert.equal(m[k].values.length, 2, k);
+    for (const k of ['lcp', 'fcp', 'tbt', 'cls', 'ttfb', 'bytes', 'requests']) assert.equal(m[k].values.length, 3, k);
     assert.equal(desktop.kind, 'perf');
     assert.equal(desktop.profile.name, 'desktop');
   });
