@@ -15,6 +15,14 @@ import { BIN, ROOT } from './helpers/cli.js';
 import { FIXTURES, startStaticServer } from './helpers/static-server.js';
 
 describe('action: pieces', () => {
+  test('action.yml fits GitHub Marketplace: a description of at most 125 characters, branding', async () => {
+    const yml = await readFile(path.join(ROOT, 'action.yml'), 'utf8');
+    const description = yml.match(/^description: (.+)$/m)[1];
+    assert.ok(description.length <= 125, `the description is ${description.length} characters; Marketplace refuses more than 125`);
+    assert.match(yml, /^name: .{1,}$/m);
+    assert.match(yml, /^branding:\n {2}icon: \S+\n {2}color: \S+$/m);
+  });
+
   test('inputs become mantis arguments, per command', () => {
     const inputs = { routes: '/, /settings', viewports: 'mobile,desktop', schemes: 'light', locales: '', runs: '3', profile: 'desktop', args: '--ignore ".ad, .promo" --timeout 45000' };
     assert.deepEqual(mantisArgs('look', 'http://x/', inputs, '/o', 'none'), [
