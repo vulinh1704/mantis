@@ -1,0 +1,21 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.vulinh1704/mantis",
+  "title": "Mantis",
+  "description": "Real-browser UI checks and speed audits for coding agents, catching fixes that only hide the bug.",
+  "repository": {
+    "url": "https://github.com/vulinh1704/mantis",
+    "source": "github"
+  },
+  "version": "0.6.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "@vulinh1704/mantis",
+      "version": "0.6.0",
+      "transport": { "type": "stdio" },
+      "packageArguments": [{ "type": "positional", "value": "mcp" }]
+    }
+  ]
+}
