@@ -59,16 +59,17 @@ export function networkChecks(r, profile, add) {
   const metricFor = (q) => (critical(q) ? 'lcp' : 'data');
 
   // The first call starts late: the code that makes it waited (deferred scripts run in document order).
+  // Without a script to blame, only a long wait counts: a busy machine alone can delay a script.
   const docEnd = v.requests.find((q) => q.type === 'Document')?.end ?? 0;
   const first = [...apis].sort((a, b) => a.start - b.start)[0];
   const caller = first?.initiator?.url ? v.requests.find((q) => q.url === first.initiator.url && q.type === 'Script') : null;
-  if (first && caller?.end != null && first.start - Math.max(docEnd, caller.end) >= 300) {
-    const ready = Math.max(docEnd, caller.end);
-    // The script that finished loading last before the call, well after the caller did: the gap up
-    // to the call is the time to parse and run it, which a slow CPU makes long.
-    const blocker = v.requests
-      .filter((q) => q !== caller && q.type === 'Script' && q.end != null && q.end <= first.start + 5 && first.start - q.end <= 1000 && q.end > caller.end + 200)
-      .sort((a, b) => b.end - a.end)[0];
+  const ready = caller?.end != null ? Math.max(docEnd, caller.end) : null;
+  // The script that finished loading last before the call, well after the caller did: the gap up
+  // to the call is the time to parse and run it, which a slow CPU makes long.
+  const blocker = ready == null ? null : v.requests
+    .filter((q) => q !== caller && q.type === 'Script' && q.end != null && q.end <= first.start + 5 && first.start - q.end <= 1000 && q.end > caller.end + 200)
+    .sort((a, b) => b.end - a.end)[0];
+  if (ready != null && first.start - ready >= (blocker ? 300 : 1000)) {
     add({
       category: 'api-late', key: shortUrl(caller.url, origin), metric: metricFor(first), savings: { ms: Math.round(first.start - ready) }, confidence: 'estimated',
       title: `The first API call starts at ${fmtMs(first.start)}, ${fmtMs(first.start - ready)} after the code that makes it arrived`,
@@ -216,7 +217,9 @@ export function networkChecks(r, profile, add) {
     const blocking = vd.requests.filter((q) => q.renderBlocking && q.end != null && fcp != null && q.start < fcp);
     const held = blocking.length ? Math.round(Math.max(0, Math.min(Math.max(...blocking.map((q) => q.end)), fcp) - docEnd)) : 0;
     if (main < 50 && bytes < 50 * 1024 && held < 50 && !vd.iframes.length) continue;
-    const kind = vd.category === 'other' ? 'third party' : vd.category.replace('-', ' ');
+    // An unknown host that only serves fonts is a font host, whoever runs it.
+    const category = vd.category === 'other' && vd.requests.length && vd.requests.every((q) => q.type === 'Font') ? 'fonts' : vd.category;
+    const kind = category === 'other' ? 'third party' : category.replace('-', ' ');
     const script = vd.requests.find((q) => q.type === 'Script') ?? vd.requests[0];
     const metric = held >= 50 ? 'fcp' : main >= 50 ? 'tbt' : 'bytes';
     const savings = metric === 'fcp' ? { ms: held } : metric === 'tbt' ? { ms: main - 50 } : { kb: Math.round(bytes / 1024) };
@@ -227,9 +230,9 @@ export function networkChecks(r, profile, add) {
       category: 'third-party', key: vd.id, metric, savings, confidence: 'estimated',
       title: `${vd.name} (${kind}): ${parts.join(', ') || 'an embedded iframe'}`,
       culprit, evidence,
-      fix: VENDOR_FIX[vd.category] ?? VENDOR_FIX.other,
-      fixRisk: 'medium', riskReason: `loading it later delays what it does${vd.category === 'chat' ? ' (the chat opens a moment later)' : vd.category === 'analytics' || vd.category === 'ads' ? ' (early bounces may go untracked)' : ''}`,
-      vendor: { name: vd.name, category: vd.category, requests: vd.requests.length, bytes, mainThreadMs: main },
+      fix: VENDOR_FIX[category] ?? VENDOR_FIX.other,
+      fixRisk: 'medium', riskReason: category === 'fonts' ? 'the files move to your own host' : `loading it later delays what it does${category === 'chat' ? ' (the chat opens a moment later)' : category === 'analytics' || category === 'ads' ? ' (early bounces may go untracked)' : ''}`,
+      vendor: { name: vd.name, category, requests: vd.requests.length, bytes, mainThreadMs: main },
     });
     if (main >= 250 || bytes >= 300 * 1024) {
       add({

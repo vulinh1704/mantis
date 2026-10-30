@@ -89,6 +89,26 @@ Mantis: 0 errors, 0 warnings in 24 cells
   vs 2026-10-29T11-51-22: 18 fixed · 0 new · 0 cover-ups · 0 lost
 ```
 
+## Nhanh thật, hay chỉ trống đi? (`mantis perf`, từ v0.6)
+
+Bảo agent "làm trang nhanh hơn", nó có thể xoá ảnh hero, cắt danh sách còn năm dòng, hoặc lazy-load luôn những gì màn hình đầu cần. Số liệu đẹp lên, còn trang thì tệ đi. `mantis perf` làm những việc sau:
+- đo trang như trên một điện thoại tầm trung với 4G chậm, lấy trung vị của nhiều lần tải lạnh;
+- chỉ ra nguyên nhân tới tận dòng code: hàm chiếm luồng chính, API chậm hoặc gọi nối đuôi, gọi trùng, N+1, ảnh quá to, script bên thứ ba;
+- xếp hạng cách sửa theo mức ảnh hưởng và rủi ro khi sửa: làm ngay, lên kế hoạch, nên có, bạn quyết;
+- báo lỗi `cover-up` khi trang nhanh hơn chỉ vì mất nội dung.
+
+```bash
+mantis perf http://localhost:4173 --routes /,/pricing
+```
+
+Chạy lại sau khi sửa, Mantis in ra một biên lai. Thay đổi nằm trong mức dao động giữa các lần chạy thì không được tính:
+
+```
+vs 2026-10-30T12-32-02: LCP 2.5 s → 36 ms · TBT 121 ms → 0 ms · CLS 0.164 → 0 · transferred 551 KB → 354 KB · 11 fixed · 0 new · 0 cover-ups
+```
+
+Chi tiết (ảnh sheet, cách xếp hạng, API và bên thứ ba) ở [README tiếng Anh](README.md#faster-or-just-emptier-mantis-perf-from-v06).
+
 ## Số liệu
 
 - **Lỗi cài sẵn:** `fixtures/buggy-app` có 13 lỗi giao diện. Mantis báo đủ cả 13, đúng ô màn hình, theme và ngôn ngữ, không báo thêm gì. Trên bản đã sửa (`clean-app`) nó báo 0. Cả hai chạy trong CI.

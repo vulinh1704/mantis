@@ -190,6 +190,26 @@ async function recordNetwork(cdp) {
   };
 }
 
+/**
+ * Record what the visitor sees: CDP screencast frames (sent when the screen changes), at most one
+ * per 50 ms. Returns a function that stops and gives `{t, jpeg}` frames, t in ms since navigation
+ * (the frame timestamps are wall-clock seconds, like performance.timeOrigin).
+ */
+async function recordFilmstrip(cdp, profile) {
+  const frames = [];
+  cdp.on('Page.screencastFrame', (e) => {
+    const ts = e.metadata.timestamp * 1000;
+    if (frames.length < 200 && (!frames.length || ts - frames[frames.length - 1].ts >= 50)) frames.push({ ts, jpeg: e.data });
+    cdp.send('Page.screencastFrameAck', { sessionId: e.sessionId }).catch(() => {});
+  });
+  const scale = Math.min(1, 360 / profile.viewport.width);
+  await cdp.send('Page.startScreencast', { format: 'jpeg', quality: 60, maxWidth: Math.round(profile.viewport.width * scale), maxHeight: Math.round(profile.viewport.height * scale) });
+  return (timeOrigin) => {
+    cdp.send('Page.stopScreencast').catch(() => {});
+    return frames.map((f) => ({ t: Math.max(0, Math.round(f.ts - timeOrigin)), jpeg: f.jpeg }));
+  };
+}
+
 /** Everything that has to be read inside the page after it settled. */
 function collectInPage() {
   const M = window.__mantis;
@@ -294,6 +314,32 @@ function collectInPage() {
     window.__NEXT_DATA__?.buildId === 'development' && 'Next.js dev server',
     has(/webpack-dev-server|sockjs-node/) && 'webpack dev server',
   ].filter(Boolean);
+  // @font-face rules with the files they point to, from the stylesheets the page can read (not
+  // cross-origin ones), to tie each font file to its font-display.
+  function fontFaceRules() {
+    const out = [];
+    for (const sheet of document.styleSheets) {
+      let rules;
+      try {
+        rules = sheet.cssRules;
+      } catch {
+        continue;
+      }
+      for (const rule of rules) {
+        if (!(rule instanceof CSSFontFaceRule) || out.length >= 200) continue;
+        const base = sheet.href || location.href;
+        const urls = [...rule.style.getPropertyValue('src').matchAll(/url\(\s*(['"]?)([^'")]+)\1\s*\)/g)].map((m) => {
+          try {
+            return new URL(m[2], base).href;
+          } catch {
+            return null;
+          }
+        }).filter(Boolean);
+        out.push({ family: rule.style.getPropertyValue('font-family').trim().replace(/^["']|["']$/g, ''), display: rule.style.getPropertyValue('font-display') || 'auto', urls });
+      }
+    }
+    return out;
+  }
   const text = (document.body?.innerText || '').replace(/\s+/g, ' ').trim();
   return {
     nav: nav ? { ttfb: Math.round(nav.responseStart), dcl: Math.round(nav.domContentLoadedEventEnd), load: Math.round(nav.loadEventEnd), transfer: nav.transferSize } : null,
@@ -302,6 +348,7 @@ function collectInPage() {
     lcpElement,
     shifts: P.shifts.map((s) => ({ t: Math.round(s.t), value: s.value, sources: s.nodes.map(sel).filter(Boolean).slice(0, 4), cause: causeOf(s) })),
     fonts: document.fonts ? [...document.fonts].map((f) => ({ family: f.family.replace(/^["']|["']$/g, ''), display: f.display, status: f.status })) : [],
+    fontRules: fontFaceRules(),
     iframes: [...document.querySelectorAll('iframe[src]')].slice(0, 30).map((f) => {
       const r = f.getBoundingClientRect();
       return { selector: sel(f), src: f.src, loading: f.getAttribute('loading'), inViewport: r.bottom > 0 && r.top < vh && r.width > 0 && r.height > 0 };
@@ -356,6 +403,7 @@ export async function measureVisit(browser, url, profile, { storageState = null,
     const page = await context.newPage();
     const cdp = await context.newCDPSession(page);
     const requests = await recordNetwork(cdp);
+    const frames = await recordFilmstrip(cdp, profile);
     await cdp.send('Network.setCacheDisabled', { cacheDisabled: true });
     if (profile.cpuSlowdown > 1) await cdp.send('Emulation.setCPUThrottlingRate', { rate: profile.cpuSlowdown });
     if (profile.network) await cdp.send('Network.emulateNetworkConditions', { offline: false, ...profile.network });
@@ -370,6 +418,7 @@ export async function measureVisit(browser, url, profile, { storageState = null,
     if (profile.cpuSlowdown > 1) await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
     await page.evaluate(installMantisLib, { ignore: [] });
     const data = await page.evaluate(collectInPage);
+    data.filmstrip = frames(await page.evaluate(() => performance.timeOrigin));
     const reqs = requests();
     const blocking = new Set(data.renderBlocking);
     for (const r of reqs) r.renderBlocking = blocking.has(r.url);

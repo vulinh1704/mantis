@@ -37,6 +37,15 @@ Full notes, with images, are on the [releases page](https://github.com/vulinh170
 - `mantis perf --baseline auto|none|<dir>` compares a run with the previous one of the same URL, profile and storage state. It prints a receipt: `LCP 2.5 s → 36 ms · TBT 121 ms → 0 ms · CLS 0.164 → 0 · 11 fixed · 0 new · 0 cover-ups`.
   - A metric counts as changed only beyond the noise: both runs' spread, 5%, and a floor per metric. Anything less is "within noise".
   - **Perf cover-ups:** a route that got faster because it got emptier is an error, "Faster, or just emptier?". That covers the LCP image turned into text or shrunk, visible text down more than 20%, and first-screen images, headings or controls gone. Findings that went away with the content are listed apart and are not counted as fixed. Exit code 1.
+- `mantis perf` draws a sheet, `perf-sheet.png`:
+  - the metrics rated against Core Web Vitals;
+  - a filmstrip of what the visitor sees, with the first paint and the LCP frame marked;
+  - a waterfall of the requests that matter;
+  - the first five fixes;
+  - main-thread time per third party.
+
+  The filmstrip frames are saved under `filmstrip/`.
+- A visit waits for the images on the first screen before it is read, so a lazy or slow hero is the LCP it really is.
 
 ## 0.5.1 (2026-10-30)
 
