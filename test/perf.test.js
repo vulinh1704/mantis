@@ -475,13 +475,23 @@ describe('mantis perf on slow-app (end-to-end)', { concurrency: false }, () => {
 
   test('every metric is the median of the runs, with its spread', () => {
     const m = route(desktop, '/').metrics;
-    for (const k of ['lcp', 'fcp', 'tbt', 'cls', 'ttfb', 'bytes', 'requests']) assert.equal(m[k].values.length, 3, k);
+    for (const k of ['fcp', 'tbt', 'cls', 'ttfb', 'bytes', 'requests']) assert.equal(m[k].values.length, 3, k);
+    // LCP leaves out the visits where Chrome missed the hero's entry (1 in 5 on CI), and says so
+    const left = Number(route(desktop, '/').notes.join(' ').match(/no LCP entry for `img\.hero` in (\d) of 3 visits/)?.[1] ?? 0);
+    assert.equal(m.lcp.values.length + left, 3, JSON.stringify(route(desktop, '/').notes));
     assert.equal(desktop.kind, 'perf');
     assert.equal(desktop.profile.name, 'desktop');
   });
 
   test('the lazy-loaded hero image is the LCP element', () => {
-    const e = route(desktop, '/').visit.lcpElement;
+    const r = route(desktop, '/');
+    if (r.visit.lcpMissed) {
+      // Chrome missed the hero's entry in every visit: Mantis names the image it missed and warns
+      assert.match(r.visit.lcpMissed.selector, /hero/);
+      assert.ok(r.notes.some((n) => /LCP may be too low/.test(n)), JSON.stringify(r.notes));
+      return;
+    }
+    const e = r.visit.lcpElement;
     assert.match(e.selector, /hero/);
     assert.equal(e.loading, 'lazy');
     assert.match(e.url, /\/hero\.png$/);
