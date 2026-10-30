@@ -1,0 +1,147 @@
+name: Mantis UI and speed check
+description: Check a preview deployment in a real browser on every screen, theme and language, or measure its speed, compare it with a baseline, and comment on the pull request.
+author: vulinh1704
+branding:
+  icon: eye
+  color: red
+
+inputs:
+  url:
+    description: The page to check, usually the pull request's preview deployment. Routes are resolved against it.
+    required: true
+  command:
+    description: look (UI checks on every screen, theme and language) or perf (speed, with fixes ranked by impact and risk).
+    default: look
+  baseline-url:
+    description: Measure this URL first (for example the production or main-branch deployment) and compare url with it, to report what the change fixed, broke or only hid.
+    default: ''
+  routes:
+    description: Comma-separated routes, e.g. /,/pricing.
+    default: ''
+  viewports:
+    description: look only. Comma-separated presets (mobile, tablet, desktop) or WxH.
+    default: ''
+  schemes:
+    description: look only. light, dark or light,dark.
+    default: ''
+  locales:
+    description: look only. Comma-separated locales, e.g. en,vi or en,pseudo.
+    default: ''
+  locale-strategy:
+    description: look only. browser, path:/{locale}, query:<param>, cookie:<name> or storage:<key>.
+    default: ''
+  dark-strategy:
+    description: look only. media, class:dark or attr:data-theme=dark.
+    default: ''
+  runs:
+    description: perf only. Cold visits per route (the median is reported).
+    default: ''
+  profile:
+    description: perf only. mobile (default, slow 4G and 4x slower CPU) or desktop.
+    default: ''
+  args:
+    description: Any other options, passed to mantis as they are.
+    default: ''
+  fail-on:
+    description: 'When the check fails. exit (default) follows the exit code of mantis (look: any error; perf: something to do first or to plan; both: a cover-up). cover-ups fails only on a cover-up. never only reports.'
+    default: exit
+  comment:
+    description: Comment the result on the pull request, updating the same comment on every run.
+    default: 'true'
+  out:
+    description: Output directory for reports, sheets and screenshots.
+    default: .mantis
+  package:
+    description: The Mantis npm package to install. Default the version of this action.
+    default: ''
+  github-token:
+    description: Token used to comment on the pull request.
+    default: ${{ github.token }}
+
+outputs:
+  errors:
+    description: look - error-level issues; perf - fixes to do first or to plan.
+    value: ${{ steps.run.outputs.errors }}
+  warnings:
+    description: look - warnings; perf - nice-to-have fixes.
+    value: ${{ steps.run.outputs.warnings }}
+  cover-ups:
+    description: Fixes that only hid a bug (look) or speed-ups that only removed content (perf), compared with the baseline.
+    value: ${{ steps.run.outputs.cover-ups }}
+  exit-code:
+    description: mantis's exit code (0 clean, 1 findings, 2 the page could not be checked).
+    value: ${{ steps.run.outputs.exit-code }}
+  report:
+    description: Path of the report (report.md or perf.md).
+    value: ${{ steps.run.outputs.report }}
+  artifact-url:
+    description: URL of the uploaded reports, sheets and screenshots.
+    value: ${{ steps.upload.outputs.artifact-url }}
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 22
+
+    - name: Install Mantis and Chromium
+      shell: bash
+      env:
+        PACKAGE: ${{ inputs.package }}
+        ACTION_PATH: ${{ github.action_path }}
+      run: |
+        pkg="$PACKAGE"
+        if [ -z "$pkg" ]; then pkg="@vulinh1704/mantis@$(node -p "require('$ACTION_PATH/package.json').version")"; fi
+        echo "Installing $pkg"
+        npm install -g --no-fund --no-audit "$pkg"
+        "$(npm root -g)/@vulinh1704/mantis/node_modules/.bin/playwright" install --with-deps chromium
+
+    - name: Run Mantis
+      id: run
+      shell: bash
+      env:
+        INPUT_URL: ${{ inputs.url }}
+        INPUT_COMMAND: ${{ inputs.command }}
+        INPUT_BASELINE_URL: ${{ inputs.baseline-url }}
+        INPUT_ROUTES: ${{ inputs.routes }}
+        INPUT_VIEWPORTS: ${{ inputs.viewports }}
+        INPUT_SCHEMES: ${{ inputs.schemes }}
+        INPUT_LOCALES: ${{ inputs.locales }}
+        INPUT_LOCALE_STRATEGY: ${{ inputs.locale-strategy }}
+        INPUT_DARK_STRATEGY: ${{ inputs.dark-strategy }}
+        INPUT_RUNS: ${{ inputs.runs }}
+        INPUT_PROFILE: ${{ inputs.profile }}
+        INPUT_ARGS: ${{ inputs.args }}
+        INPUT_FAIL_ON: ${{ inputs.fail-on }}
+        INPUT_OUT: ${{ inputs.out }}
+      run: node "${{ github.action_path }}/action/run.mjs"
+
+    - name: Upload reports
+      id: upload
+      if: always() && steps.run.outputs.out-dir != ''
+      uses: actions/upload-artifact@v4
+      with:
+        name: mantis-${{ inputs.command }}-${{ github.run_attempt }}
+        path: ${{ steps.run.outputs.out-dir }}
+        include-hidden-files: true
+        if-no-files-found: ignore
+
+    - name: Comment on the pull request
+      if: always() && inputs.comment == 'true' && steps.run.outputs.comment-file != ''
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        COMMENT_FILE: ${{ steps.run.outputs.comment-file }}
+        ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
+        COMMAND: ${{ inputs.command }}
+      run: node "${{ github.action_path }}/action/comment.mjs"
+
+    - name: Result
+      if: always() && steps.run.outputs.fail == 'true'
+      shell: bash
+      env:
+        REASON: ${{ steps.run.outputs.reason }}
+      run: |
+        echo "::error title=Mantis::$REASON"
+        exit 1
