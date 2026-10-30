@@ -21,7 +21,7 @@ On Claude Code older than 2.1.275, run `/plugin marketplace add vulinh1704/manti
 
 ## What it runs and touches
 
-- **Commands.** The skills tell the agent to run the Mantis CLI, either as `mantis` or as `npx -y @vulinh1704/mantis@0.7.0`. npx downloads that exact version of the CLI and its dependencies (Playwright and axe-core) from npm. Playwright may also download Chromium.
+- **Commands.** The skills tell the agent to run the Mantis CLI, either as `mantis` or as `npx -y @vulinh1704/mantis@0.7.1`. npx downloads that exact version of the CLI and its dependencies (Playwright and axe-core) from npm. Playwright may also download Chromium.
 - **Pages.** The CLI opens only the URLs the agent passes to it, usually the app's local dev server, in headless Chromium.
 - **Writes.** It writes reports, screenshots and perf filmstrips to `.mantis/` in the project, with a `.gitignore` that keeps them out of git.
 - **Sends.** Nothing. There is no telemetry and no account.
